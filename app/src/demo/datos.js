@@ -59,8 +59,8 @@ export function crearBD() {
       id: u.id, email: u.email, nombre: u.nombre, es_admin_global: !!u.admin, creado_en: H
     })),
     asociaciones: [
-      { id: ASOC, nombre: 'Club Juvenil de Ejemplo', creada_en: H },
-      { id: ASOC2, nombre: 'Otra Asociación (vacía)', creada_en: H }
+      { id: ASOC, nombre: 'Club Juvenil de Ejemplo', foto_ruta: null, creada_en: H },
+      { id: ASOC2, nombre: 'Otra Asociación (vacía)', foto_ruta: null, creada_en: H }
     ],
     apps: [
       { clave: 'socios', nombre: 'Socios', descripcion: 'Base de datos de socios, altas y bajas' },

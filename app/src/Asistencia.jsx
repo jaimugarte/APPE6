@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodo, abrev } from './util'
+import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodoCorta, abrev } from './util'
+import SelectorPeriodo from './SelectorPeriodo'
+import { IconoCalendario } from './iconos'
 
 const CONFLICTO = 'socio_id,tipo_actividad_id,periodo_inicio'
 
@@ -23,6 +25,7 @@ function PantallaAsistencia({ asoc, rol, email }) {
   const [nivel, setNivel] = useState('')
   const [q, setQ] = useState('')
   const [msg, setMsg] = useState('')
+  const [cal, setCal] = useState(false)
 
   const esEncargado = rol === 'encargado'
   const esPreceptor = rol === 'preceptor'
@@ -141,7 +144,7 @@ function PantallaAsistencia({ asoc, rol, email }) {
 
   return (
     <main className="asistencia">
-      <div className="chips tipos">
+      <div className="chips tipos una-linea">
         {tipos.map(t => (
           <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} title={t.nombre}
             aria-label={`${t.nombre}, ${t.periodicidad}`} aria-pressed={t.id === tipoId} onClick={() => seleccionar(t)}>
@@ -152,44 +155,43 @@ function PantallaAsistencia({ asoc, rol, email }) {
 
       {tipo && inicio && (
         <>
-          <p className="act-nombre"><b>{tipo.nombre}</b> <small>{tipo.periodicidad}</small></p>
           <div className="navperiodo">
             <button aria-label="Periodo anterior" onClick={() => setInicio(sumarPeriodos(inicio, per, -1))}>‹</button>
-            <div className="etiqueta">
-              <b>{etiquetaPeriodo(inicio, per)}</b>
-              {inicio === actual && <span className="badge ok">actual</span>}
+            <div className="periodo-w">
+              <button className="periodo" aria-haspopup="dialog" aria-expanded={cal} onClick={() => setCal(c => !c)}>
+                <span className="periodo-txt">
+                  <small>{tipo.nombre} · {tipo.periodicidad}</small>
+                  <b>{etiquetaPeriodoCorta(inicio, per, hoy())}</b>
+                </span>
+                {inicio === actual && <span className="badge ok">actual</span>}
+                <IconoCalendario />
+              </button>
+              {cal && <SelectorPeriodo inicio={inicio} per={per} hoyIso={hoy()} onElegir={setInicio} onCerrar={() => setCal(false)} />}
             </div>
             <button aria-label="Periodo siguiente" disabled={inicio >= actual}
               onClick={() => setInicio(sumarPeriodos(inicio, per, 1))}>›</button>
           </div>
-          <div className="fila">
-            <button disabled={inicio === actual} onClick={() => setInicio(actual)}>Ir al actual</button>
-            <label className="fila">Ir a la fecha
-              <input type="date" max={hoy()} value="" onChange={e => e.target.value && setInicio(inicioPeriodo(e.target.value, per))} />
-            </label>
-          </div>
 
           {msg && <p className="error">{msg}</p>}
 
-          <div className="filtros dos">
-            <input type="search" placeholder="Buscar socio" value={q} onChange={e => setQ(e.target.value)} />
-            <select value={nivel} onChange={e => setNivel(e.target.value)}>
-              <option value="">Todos los niveles</option>
+          <div className="filtros dos una">
+            <input type="search" placeholder="Buscar socio" aria-label="Buscar socio" value={q} onChange={e => setQ(e.target.value)} />
+            <select value={nivel} aria-label="Nivel" onChange={e => setNivel(e.target.value)}>
+              <option value="">Nivel: todos</option>
               {niveles.map(n => <option key={n}>{n}</option>)}
             </select>
           </div>
 
           <div className="resumen">
-            <span><b>{asistieron}</b> asistieron</span>
-            <span><b>{lista.length - asistieron}</b> no asistieron</span>
+            <span><b>{asistieron}</b> Sí</span>
+            <span><b>{lista.length - asistieron}</b> No</span>
+            {puedeEditar && lista.length > 0 && (
+              <span className="bloque">
+                <button className="mini" disabled={asistieron === lista.length} onClick={todosSi}>Todos Sí</button>
+                <button className="mini" disabled={asistieron === 0} onClick={ninguno}>Todos No</button>
+              </span>
+            )}
           </div>
-
-          {puedeEditar && lista.length > 0 && (
-            <div className="fila">
-              <button disabled={asistieron === lista.length} onClick={todosSi}>Todos: Sí</button>
-              <button disabled={asistieron === 0} onClick={ninguno}>Todos: No</button>
-            </div>
-          )}
 
           {lista.length === 0 && (
             <p className="aviso">

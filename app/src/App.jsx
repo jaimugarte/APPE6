@@ -5,6 +5,7 @@ import Ajustes from './Ajustes'
 import Socios from './Socios'
 import Asistencia from './Asistencia'
 import { Logo, IconoApp } from './iconos'
+import { useFotoUrl } from './foto'
 
 // ECharts pesa bastante: solo se descarga al abrir Estadísticas
 const Estadisticas = lazy(() => import('./Estadisticas'))
@@ -25,6 +26,7 @@ export default function App() {
   const [vista, setVista] = useState('hub')
   const [abierta, setAbierta] = useState(null)
   const error = new URLSearchParams(location.search).get('error_description')
+  const fotoUrl = useFotoUrl(ctx?.mem?.asociaciones?.foto_ruta)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -40,7 +42,7 @@ export default function App() {
     const uid = session.user.id
     const { data: perfil } = await supabase.from('perfiles').select('*').eq('id', uid).single()
     const { data: mem } = await supabase
-      .from('membresias').select('rol, asociacion_id, asociaciones(nombre)').eq('user_id', uid).maybeSingle()
+      .from('membresias').select('rol, asociacion_id, asociaciones(nombre, foto_ruta)').eq('user_id', uid).maybeSingle()
     let apps = []
     if (mem) {
       const { data } = await supabase
@@ -110,7 +112,9 @@ export default function App() {
       <header className="cabecera">
         <div className="cabecera-in">
           <div className="marca">
-            <span className="logo"><Logo /></span>
+            {fotoUrl
+              ? <img className="avatar" src={fotoUrl} alt="" />
+              : <span className="logo"><Logo /></span>}
             <div>
               <strong>{mem?.asociaciones?.nombre || 'Administración global'}</strong>
               <span className="rol">{esAdmin ? 'Admin global' : ROL[mem?.rol]}</span>
@@ -129,6 +133,7 @@ export default function App() {
       {vista === 'hub' && (
         <main>
           <h1 className="solo-lectores">Apps de la asociación</h1>
+          {fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${mem?.asociaciones?.nombre || 'la asociación'}`} />}
           {activas.length === 0 && (
             <div className="vacio">
               <p>
@@ -164,7 +169,7 @@ export default function App() {
       {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
-        <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} recargar={cargar} />}
+        <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}
     </div>
   )

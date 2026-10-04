@@ -46,9 +46,9 @@ export const limpiarAbrev = s => (s || '').replace(/\s+/g, '').toUpperCase().sli
 export const esEmail = s => !s || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
 // ---------- Periodos de actividad ----------
-const p2 = n => String(n).padStart(2, '0')
-const aIso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
-const deIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+export const p2 = n => String(n).padStart(2, '0')
+export const aIso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+export const deIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 
 // Inicio del periodo que contiene la fecha. Coincide con inicio_periodo() de la base de datos:
 // lunes de la semana, o día 1 del mes, trimestre o año.
@@ -90,4 +90,25 @@ export function etiquetaPeriodo(inicio, per) {
   }
   if (per === 'trimestral') return `${Math.floor(d.getMonth() / 3) + 1}.º trimestre ${d.getFullYear()}`
   return `Año ${d.getFullYear()}`
+}
+
+// Etiqueta abreviada pero clara: «28 sep – 4 oct», «Oct 2026», «T4 2026 (oct–dic)», «2026»
+export function etiquetaPeriodoCorta(inicio, per, hoyIso) {
+  const d = deIso(inicio)
+  const mes = x => ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][x.getMonth()] // fijas: el locale da «sept»
+  const cap = t => t[0].toUpperCase() + t.slice(1)
+  if (per === 'semanal') {
+    const f = deIso(finPeriodo(inicio, per))
+    const anyoActual = hoyIso ? Number(hoyIso.slice(0, 4)) : d.getFullYear()
+    const ini = `${d.getDate()} ${mes(d)}`, fi = `${f.getDate()} ${mes(f)}`
+    const conAnyo = d.getFullYear() !== f.getFullYear() || d.getFullYear() !== anyoActual
+    return `${ini}${d.getFullYear() !== f.getFullYear() ? ' ' + d.getFullYear() : ''} – ${fi}${conAnyo ? ' ' + f.getFullYear() : ''}`
+  }
+  if (per === 'mensual') return `${cap(mes(d))} ${d.getFullYear()}`
+  if (per === 'trimestral') {
+    const q = Math.floor(d.getMonth() / 3)
+    const m1 = new Date(d.getFullYear(), q * 3, 1), m3 = new Date(d.getFullYear(), q * 3 + 2, 1)
+    return `T${q + 1} ${d.getFullYear()} (${mes(m1)}–${mes(m3)})`
+  }
+  return String(d.getFullYear())
 }

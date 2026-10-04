@@ -24,6 +24,7 @@ create table perfiles (
 create table asociaciones (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
+  foto_ruta text,                    -- foto de la asociación (objeto en el bucket asociacion-fotos)
   creada_en timestamptz not null default now()
 );
 
@@ -277,10 +278,28 @@ language sql stable security definer set search_path = public as
 create function activar_app(p_asoc uuid, p_app text, p_activa boolean) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if rol_en(p_asoc) <> 'encargado' then raise exception 'Solo el encargado'; end if;
+  -- «is distinct from»: si el usuario no pertenece a la asociación rol_en es null y «<>» no lo bloquearía
+  if rol_en(p_asoc) is distinct from 'encargado' then raise exception 'Solo el encargado'; end if;
   update asociacion_apps set activa = p_activa
     where asociacion_id = p_asoc and app_clave = p_app and permitida;
 end $$;
+
+-- Foto de la asociación: solo el encargado, y el archivo debe estar en la carpeta de su asociación
+create function establecer_foto_asociacion(p_asoc uuid, p_ruta text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if rol_en(p_asoc) is distinct from 'encargado' then raise exception 'Solo el encargado'; end if;
+  if p_ruta is not null and split_part(p_ruta, '/', 1) <> p_asoc::text then
+    raise exception 'La foto debe estar en la carpeta de la asociación';
+  end if;
+  update asociaciones set foto_ruta = p_ruta where id = p_asoc;
+end $$;
+
+-- Rol del usuario en la asociación de una carpeta de storage (primer segmento de la ruta); null si no es un uuid o no es miembro
+create function rol_en_carpeta(p_nombre text) returns rol_usuario
+language sql stable security definer set search_path = public as $$
+  select case when split_part(p_nombre, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then rol_en(split_part(p_nombre, '/', 1)::uuid) end $$;
 
 -- ---------- ROW LEVEL SECURITY ----------
 alter table global_admins       enable row level security;
@@ -365,3 +384,20 @@ create policy ra_ins on registros_asistencia for insert with check (puede_socio(
 create policy ra_upd on registros_asistencia for update
   using (puede_socio(socio_id, 'asistencia', 'editar')) with check (puede_socio(socio_id, 'asistencia', 'editar'));
 create policy ra_del on registros_asistencia for delete using (puede_socio(socio_id, 'asistencia', 'editar'));
+
+-- ---------- STORAGE: foto de la asociación ----------
+-- Bucket privado (las fotos pueden mostrar menores): se sirve con URLs firmadas de caducidad corta.
+-- Ruta de cada objeto: <id de la asociación>/<archivo>. Ven la foto los miembros; solo el encargado la cambia.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('asociacion-fotos', 'asociacion-fotos', false, 3145728, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
+create policy af_ver on storage.objects for select to authenticated
+  using (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) is not null);
+create policy af_subir on storage.objects for insert to authenticated
+  with check (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado');
+create policy af_cambiar on storage.objects for update to authenticated
+  using (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado')
+  with check (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado');
+create policy af_borrar on storage.objects for delete to authenticated
+  using (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado');

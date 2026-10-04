@@ -28,3 +28,11 @@ export function Logo({ size = 20 }) {
     </svg>
   )
 }
+
+export function IconoCalendario({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...trazo}>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="3" /><path d="M8 3.5v4M16 3.5v4M4 10h16" />
+    </svg>
+  )
+}

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Permisos from './Permisos'
+import FotoAsociacion from './FotoAsociacion'
 import { abrev, limpiarAbrev } from './util'
 
-export default function Ajustes({ asoc, apps, uid, recargar }) {
+export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
   const [tipos, setTipos] = useState([])
   const [accesos, setAccesos] = useState([])
   const [email, setEmail] = useState('')
@@ -65,6 +66,8 @@ export default function Ajustes({ asoc, apps, uid, recargar }) {
   return (
     <main>
       {msg && <p className="error">{msg}</p>}
+      <FotoAsociacion asoc={asoc} fotoRuta={fotoRuta} recargar={recargar} />
+
       <section>
         <h2>Apps de la asociación</h2>
         {apps.filter(a => a.permitida).map(a => (

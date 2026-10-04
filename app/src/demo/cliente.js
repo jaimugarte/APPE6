@@ -60,6 +60,7 @@ export function crearClienteDemo() {
   const sesion = () => (usuario ? { user: { id: usuario.id, email: usuario.email } } : null)
   const notificar = () => oyentes.forEach(f => f('SIGNED_IN', sesion()))
 
+  const objetos = new Map() // archivos subidos a storage en la demo
   const ctx = () => {
     if (!usuario) return null
     const mem = db.membresias.find(m => m.user_id === usuario.id)
@@ -252,9 +253,42 @@ export function crearClienteDemo() {
   return {
     from: tabla => new Consulta(tabla),
 
+    // Imita el bucket privado asociacion-fotos: ven los miembros de la carpeta, sube solo su encargado
+    storage: {
+      from: bucket => ({
+        upload: async (ruta, blob) => {
+          const u = ctx()
+          if (bucket !== 'asociacion-fotos' || u?.rol !== 'encargado' || ruta.split('/')[0] !== u.asoc)
+            return err('42501', 'new row violates row-level security policy')
+          objetos.set(ruta, blob)
+          return { data: { path: ruta }, error: null }
+        },
+        createSignedUrl: async ruta => {
+          const u = ctx()
+          if (!u || u.admin || ruta.split('/')[0] !== u.asoc || !objetos.has(ruta)) return err('404', 'Object not found')
+          const b = objetos.get(ruta)
+          const url = typeof URL !== 'undefined' && URL.createObjectURL && typeof Blob !== 'undefined' && b instanceof Blob
+            ? URL.createObjectURL(b) : `demo://${ruta}`
+          return { data: { signedUrl: url }, error: null }
+        },
+        remove: async rutas => {
+          const u = ctx()
+          const borrados = []
+          if (u?.rol === 'encargado') for (const r of rutas) if (r.split('/')[0] === u.asoc && objetos.delete(r)) borrados.push({ name: r })
+          return { data: borrados, error: null }
+        }
+      })
+    },
+
     rpc: async (nombre, a) => {
-      if (nombre !== 'activar_app') return err('42883', `Función desconocida: ${nombre}`)
       const u = ctx()
+      if (nombre === 'establecer_foto_asociacion') {
+        if (u?.rol !== 'encargado' || u.asoc !== a.p_asoc) return err('P0001', 'Solo el encargado')
+        if (a.p_ruta != null && a.p_ruta.split('/')[0] !== a.p_asoc) return err('P0001', 'La foto debe estar en la carpeta de la asociación')
+        db.asociaciones.find(x => x.id === a.p_asoc).foto_ruta = a.p_ruta
+        return { data: null, error: null }
+      }
+      if (nombre !== 'activar_app') return err('42883', `Función desconocida: ${nombre}`)
       if (u?.rol !== 'encargado' || u.asoc !== a.p_asoc) return err('P0001', 'Solo el encargado')
       const f = db.asociacion_apps.find(x => x.asociacion_id === a.p_asoc && x.app_clave === a.p_app && x.permitida)
       if (f) f.activa = a.p_activa
