@@ -248,3 +248,13 @@ input.abrev { width: 84px; min-height: 40px; text-align: center; text-transform:
 .avatar { width: 32px; height: 32px; flex: none; border-radius: 10px; object-fit: cover; background: var(--acento-suave); }
 .banner { display: block; width: 100%; aspect-ratio: 16 / 7; object-fit: cover; border-radius: var(--r-lg); border: 1px solid var(--linea); margin-bottom: 16px; background: var(--acento-suave); }
 .foto-prev { display: block; width: 100%; max-width: 420px; aspect-ratio: 16 / 7; object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--linea); margin-bottom: 8px; }
+
+/* Pantallas muy estrechas (≈320 px) */
+.periodo-txt b { white-space: nowrap; }
+@media (max-width: 359px) {
+  .periodo { padding: 4px 8px; gap: 5px; }
+  .periodo-txt b { font-size: .92rem; }
+  .periodo .badge { font-size: .65rem; padding: 1px 6px; }
+  .filtros.una { grid-template-columns: 1fr 1fr; }
+  .filtros.una select { padding-left: 8px; padding-right: 4px; font-size: .875rem; }
+}
