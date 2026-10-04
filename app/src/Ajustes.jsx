@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import Permisos from './Permisos'
 
 export default function Ajustes({ asoc, apps, uid, recargar }) {
   const [tipos, setTipos] = useState([])
@@ -82,6 +83,8 @@ export default function Ajustes({ asoc, apps, uid, recargar }) {
           <button onClick={addAcceso}>Autorizar</button>
         </div>
       </section>
+
+      <Permisos asoc={asoc} apps={apps} />
     </main>
   )
 }

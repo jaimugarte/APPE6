@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Ajustes from './Ajustes'
+import Socios from './Socios'
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -9,7 +10,7 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [ctx, setCtx] = useState(null)
   const [vista, setVista] = useState('hub')
-  const [proximamente, setProx] = useState(null)
+  const [abierta, setAbierta] = useState(null)
   const error = new URLSearchParams(location.search).get('error_description')
 
   useEffect(() => {
@@ -77,14 +78,17 @@ export default function App() {
           {activas.length === 0 && <p>No hay apps activas todavía{esEncargado && ': actívalas en Ajustes'}.</p>}
           <div className="grid">
             {activas.map(a => (
-              <button key={a.app_clave} className="tarjeta" onClick={() => setProx(a.apps.nombre)}>
+              <button key={a.app_clave} className="tarjeta" onClick={() => { setAbierta(a); setVista('app') }}>
                 <b>{a.apps.nombre}</b><span>{a.apps.descripcion}</span>
               </button>
             ))}
           </div>
-          {proximamente && <p className="aviso">«{proximamente}» se construirá en el siguiente paso.</p>}
         </main>
       )}
+      {vista === 'app' && abierta?.app_clave === 'socios' &&
+        <Socios asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
+      {vista === 'app' && abierta && abierta.app_clave !== 'socios' &&
+        <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}
