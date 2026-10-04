@@ -37,3 +37,50 @@ export function ibanValido(s) {
 }
 
 export const esEmail = s => !s || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+
+// ---------- Periodos de actividad ----------
+const p2 = n => String(n).padStart(2, '0')
+const aIso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+const deIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+
+// Inicio del periodo que contiene la fecha. Coincide con inicio_periodo() de la base de datos:
+// lunes de la semana, o día 1 del mes, trimestre o año.
+export function inicioPeriodo(f, per) {
+  const d = deIso(f)
+  if (per === 'semanal') d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  else if (per === 'mensual') d.setDate(1)
+  else if (per === 'trimestral') { d.setDate(1); d.setMonth(d.getMonth() - (d.getMonth() % 3)) }
+  else { d.setDate(1); d.setMonth(0) }
+  return aIso(d)
+}
+
+export function sumarPeriodos(inicio, per, n) {
+  const d = deIso(inicio)
+  if (per === 'semanal') d.setDate(d.getDate() + 7 * n)
+  else if (per === 'mensual') d.setMonth(d.getMonth() + n)
+  else if (per === 'trimestral') d.setMonth(d.getMonth() + 3 * n)
+  else d.setFullYear(d.getFullYear() + n)
+  return aIso(d)
+}
+
+// Último día (incluido) del periodo
+export function finPeriodo(inicio, per) {
+  const d = deIso(sumarPeriodos(inicio, per, 1))
+  d.setDate(d.getDate() - 1)
+  return aIso(d)
+}
+
+export function etiquetaPeriodo(inicio, per) {
+  const d = deIso(inicio)
+  if (per === 'semanal') {
+    const f = deIso(finPeriodo(inicio, per))
+    const c = { day: 'numeric', month: 'short' }
+    return `Semana del ${d.toLocaleDateString('es-ES', c)} al ${f.toLocaleDateString('es-ES', { ...c, year: 'numeric' })}`
+  }
+  if (per === 'mensual') {
+    const t = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    return t[0].toUpperCase() + t.slice(1)
+  }
+  if (per === 'trimestral') return `${Math.floor(d.getMonth() / 3) + 1}.º trimestre ${d.getFullYear()}`
+  return `Año ${d.getFullYear()}`
+}

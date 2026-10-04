@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import Admin from './Admin'
 import Ajustes from './Ajustes'
 import Socios from './Socios'
+import Asistencia from './Asistencia'
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -87,7 +88,9 @@ export default function App() {
       )}
       {vista === 'app' && abierta?.app_clave === 'socios' &&
         <Socios asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta && abierta.app_clave !== 'socios' &&
+      {vista === 'app' && abierta?.app_clave === 'asistencia' &&
+        <Asistencia asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
+      {vista === 'app' && abierta && !['socios', 'asistencia'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} recargar={cargar} />}
