@@ -160,8 +160,13 @@ button.chip.tipo:hover:not(:disabled):not(.on) { background: #f6f8fc; border-col
 
 /* ---------- Asistencia (compacta, pensada para el móvil) ---------- */
 .app main.asistencia { padding-top: 12px; }
-.chips.una-linea { flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
-.chips.una-linea .chip.tipo { flex: 1 1 auto; min-width: 0; min-height: 34px; padding: 4px 6px; font-size: .8125rem; letter-spacing: .01em; }
+.chips-w { position: relative; margin-bottom: 8px; }
+.chips.una-linea { flex-wrap: nowrap; gap: 4px; margin: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+.chips.una-linea::-webkit-scrollbar { display: none; }
+.chips.una-linea .chip.tipo { flex: 1 0 auto; min-width: 0; min-height: 34px; padding: 4px 8px; font-size: .78rem; letter-spacing: 0; scroll-snap-align: center; }
+.chips-w.mas-der::after, .chips-w.mas-izq::before { content: ''; position: absolute; top: 0; bottom: 0; width: 26px; pointer-events: none; z-index: 1; }
+.chips-w.mas-der::after { right: 0; background: linear-gradient(to left, var(--papel), rgba(244, 246, 250, 0)); }
+.chips-w.mas-izq::before { left: 0; background: linear-gradient(to right, var(--papel), rgba(244, 246, 250, 0)); }
 .navperiodo { display: grid; grid-template-columns: 42px 1fr 42px; gap: 6px; align-items: stretch; margin-bottom: 8px; }
 .navperiodo > button { min-height: 46px; padding: 0; font-size: 1.4rem; line-height: 1; }
 .periodo-w { position: relative; min-width: 0; }

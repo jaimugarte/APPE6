@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodoCorta, abrev } from './util'
+import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodoCorta } from './util'
+import ChipsActividades from './ChipsActividades'
 import SelectorPeriodo from './SelectorPeriodo'
 import { IconoCalendario } from './iconos'
 
@@ -144,14 +145,7 @@ function PantallaAsistencia({ asoc, rol, email }) {
 
   return (
     <main className="asistencia">
-      <div className="chips tipos una-linea">
-        {tipos.map(t => (
-          <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} title={t.nombre}
-            aria-label={`${t.nombre}, ${t.periodicidad}`} aria-pressed={t.id === tipoId} onClick={() => seleccionar(t)}>
-            {abrev(t)}
-          </button>
-        ))}
-      </div>
+      <ChipsActividades tipos={tipos} tipoId={tipoId} onElegir={seleccionar} />
 
       {tipo && inicio && (
         <>
