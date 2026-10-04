@@ -1,9 +1,12 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Ajustes from './Ajustes'
 import Socios from './Socios'
 import Asistencia from './Asistencia'
+
+// ECharts pesa bastante: solo se descarga al abrir Estadísticas
+const Estadisticas = lazy(() => import('./Estadisticas'))
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -33,7 +36,14 @@ export default function App() {
         .eq('asociacion_id', mem.asociacion_id)
       apps = data || []
     }
-    setCtx({ perfil, mem, apps })
+    // Un preceptor solo ve en el hub las apps sobre las que el encargado le ha dado permiso de ver
+    let permisos = []
+    if (mem?.rol === 'preceptor') {
+      const { data } = await supabase.from('permisos_preceptor')
+        .select('app_clave, puede_ver').eq('asociacion_id', mem.asociacion_id)
+      permisos = data || []
+    }
+    setCtx({ perfil, mem, apps, permisos })
   }, [session])
 
   useEffect(() => { cargar() }, [cargar])
@@ -54,10 +64,14 @@ export default function App() {
 
   if (!ctx) return <p className="centro">Cargando…</p>
 
-  const { perfil, mem, apps } = ctx
+  const { perfil, mem, apps, permisos } = ctx
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
-  const activas = apps.filter(a => a.activa)
+  const visible = a => esEncargado
+    || (mem?.rol === 'preceptor'
+      ? !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver
+      : a.app_clave !== 'estadisticas') // las familias no ven estadísticas
+  const activas = apps.filter(a => a.activa && visible(a))
 
   return (
     <div className="app">
@@ -90,7 +104,11 @@ export default function App() {
         <Socios asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
       {vista === 'app' && abierta?.app_clave === 'asistencia' &&
         <Asistencia asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta && !['socios', 'asistencia'].includes(abierta.app_clave) &&
+      {vista === 'app' && abierta?.app_clave === 'estadisticas' &&
+        <Suspense fallback={<main><p>Cargando…</p></main>}>
+          <Estadisticas asoc={mem.asociacion_id} rol={mem.rol} />
+        </Suspense>}
+      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} recargar={cargar} />}
