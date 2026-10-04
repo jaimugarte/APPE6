@@ -1,0 +1,20 @@
+:root { --c: #1d4ed8; font-family: system-ui, sans-serif; color: #111; }
+body { margin: 0; background: #f5f7fb; }
+.centro { min-height: 100vh; display: grid; place-content: center; text-align: center; gap: 12px; padding: env(safe-area-inset-top) 16px; }
+.app { max-width: 720px; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); }
+header { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: #fff; border-bottom: 1px solid #e3e7ee; }
+header small { display: block; color: #667; }
+nav { display: flex; gap: 6px; }
+main { padding: 16px; }
+section { background: #fff; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
+h2 { font-size: 1rem; margin: 4px 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.tarjeta { background: #fff; border: 1px solid #e3e7ee; border-radius: 14px; padding: 16px; text-align: left;
+  display: grid; gap: 4px; min-height: 90px; }
+.tarjeta span { color: #667; font-size: .85rem; }
+.fila { display: flex; gap: 8px; align-items: center; padding: 6px 0; flex-wrap: wrap; }
+button, input, select { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #ccd3df; background: #fff; }
+button { cursor: pointer; }
+button.primario { background: var(--c); color: #fff; border: 0; padding: 12px 20px; }
+.error { color: #b91c1c; } .aviso { color: #667; }
