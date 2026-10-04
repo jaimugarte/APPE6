@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
-import { supabase } from './supabase'
+import { supabase, DEMO } from './supabase'
 import Admin from './Admin'
 import Ajustes from './Ajustes'
 import Socios from './Socios'
@@ -19,7 +19,10 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s)
+      if (!s) { setCtx(null); setVista('hub'); setAbierta(null) } // al salir, no queda nada del usuario anterior
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -54,11 +57,23 @@ export default function App() {
     return (
       <main className="centro">
         <h1>Hub de Asociación</h1>
-        {error && <p className="error">{error}. Pide a tu encargado que autorice tu correo.</p>}
-        <button className="primario" onClick={() =>
-          supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } })}>
-          Entrar con Google
-        </button>
+        {DEMO ? (
+          <>
+            <p className="aviso">Modo demo con datos de ejemplo. Elige con qué rol quieres entrar:</p>
+            <div className="roles-demo">
+              {[['encargado', 'Encargado'], ['preceptor', 'Preceptor (1º y 2º ESO)'], ['familia', 'Familia'], ['admin', 'Admin global']]
+                .map(([k, t]) => <button key={k} className="primario" onClick={() => supabase.auth.entrarComo(k)}>{t}</button>)}
+            </div>
+          </>
+        ) : (
+          <>
+            {error && <p className="error">{error}. Pide a tu encargado que autorice tu correo.</p>}
+            <button className="primario" onClick={() =>
+              supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } })}>
+              Entrar con Google
+            </button>
+          </>
+        )}
       </main>
     )
 
@@ -75,6 +90,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {DEMO && <div className="demo">Modo demo · datos de ejemplo que se reinician al recargar la página</div>}
       <header>
         <div>
           <strong>{mem?.asociaciones?.nombre || 'Administración global'}</strong>
