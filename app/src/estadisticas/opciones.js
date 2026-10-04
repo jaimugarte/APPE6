@@ -162,7 +162,8 @@ export function opcionEdades(filas) {
 export function opcionMapaCalor(m) {
   const data = m.celdas.map(c => ({
     value: [c.x, c.y, c.pct], c,
-    label: { color: c.pct >= 50 ? '#ffffff' : C.texto }
+    // Texto blanco solo sobre los azules oscuros; sobre los medios y claros, tinta oscura
+    label: { color: c.pct >= 60 ? '#ffffff' : C.texto }
   }))
   return {
     ...base(),
