@@ -136,23 +136,25 @@ create table tipos_actividad (
   id uuid primary key default gen_random_uuid(),
   asociacion_id uuid not null references asociaciones on delete cascade,
   nombre text not null,
+  abreviatura text check (abreviatura is null or (abreviatura = upper(abreviatura) and char_length(abreviatura) between 2 and 6)),
   periodicidad periodicidad not null,
   activa boolean not null default true,   -- "de interés" para la asociación
   orden int not null default 0,
-  unique (asociacion_id, nombre)
+  unique (asociacion_id, nombre),
+  unique (asociacion_id, abreviatura)
 );
 
 -- Actividades por defecto al crear una asociación
 create function sembrar_actividades() returns trigger language plpgsql as $$
 begin
-  insert into tipos_actividad(asociacion_id, nombre, periodicidad, orden) values
-    (new.id, 'Charla', 'semanal', 1),
-    (new.id, 'Círculo', 'semanal', 2),
-    (new.id, 'Visita de pobres', 'mensual', 3),
-    (new.id, 'Retiro mensual', 'mensual', 4),
-    (new.id, 'Curso de retiro', 'anual', 5),
-    (new.id, 'Preceptuación', 'semanal', 6),
-    (new.id, 'Sacerdote', 'semanal', 7);
+  insert into tipos_actividad(asociacion_id, nombre, abreviatura, periodicidad, orden) values
+    (new.id, 'Charla', 'CHAR', 'semanal', 1),
+    (new.id, 'Círculo', 'CIRC', 'semanal', 2),
+    (new.id, 'Visita de pobres', 'VIPO', 'mensual', 3),
+    (new.id, 'Retiro mensual', 'RTME', 'mensual', 4),
+    (new.id, 'Curso de retiro', 'CRT', 'anual', 5),
+    (new.id, 'Preceptuación', 'PREC', 'semanal', 6),
+    (new.id, 'Sacerdote', 'SACD', 'semanal', 7);
   return new;
 end $$;
 create trigger t_sembrar after insert on asociaciones
@@ -326,8 +328,8 @@ create policy pn_ver on preceptor_niveles for select
 create policy pn_enc on preceptor_niveles for all
   using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
 
--- Tipos de actividad: ve cualquier miembro, define el encargado
-create policy ta_ver on tipos_actividad for select using (rol_en(asociacion_id) is not null);
+-- Tipos de actividad: las ven encargado y preceptores (las familias no usan Asistencia); define el encargado
+create policy ta_ver on tipos_actividad for select using (rol_en(asociacion_id) in ('encargado', 'preceptor'));
 create policy ta_enc on tipos_actividad for all
   using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
 
@@ -355,9 +357,10 @@ create policy fs_ver on familiares_socios for select
 create policy fs_enc on familiares_socios for all
   using (puede_socio(socio_id, 'socios', 'editar')) with check (puede_socio(socio_id, 'socios', 'editar'));
 
--- Asistencia
+-- Asistencia: solo encargado y preceptores con permiso. La familia nunca accede, ni a los datos de sus hijos.
+-- Sin registro significa que no asistió: solo se guardan las asistencias.
 create policy ra_ver on registros_asistencia for select
-  using (puede_socio(socio_id, 'asistencia', 'ver') or es_familiar_de(socio_id));
+  using (puede_socio(socio_id, 'asistencia', 'ver'));
 create policy ra_ins on registros_asistencia for insert with check (puede_socio(socio_id, 'asistencia', 'editar'));
 create policy ra_upd on registros_asistencia for update
   using (puede_socio(socio_id, 'asistencia', 'editar')) with check (puede_socio(socio_id, 'asistencia', 'editar'));

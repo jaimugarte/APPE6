@@ -19,8 +19,9 @@ const REL = {
 }
 
 const TIPOS_POR_DEFECTO = [
-  ['Charla', 'semanal'], ['Círculo', 'semanal'], ['Visita de pobres', 'mensual'], ['Retiro mensual', 'mensual'],
-  ['Curso de retiro', 'anual'], ['Preceptuación', 'semanal'], ['Sacerdote', 'semanal']
+  ['Charla', 'CHAR', 'semanal'], ['Círculo', 'CIRC', 'semanal'], ['Visita de pobres', 'VIPO', 'mensual'],
+  ['Retiro mensual', 'RTME', 'mensual'], ['Curso de retiro', 'CRT', 'anual'],
+  ['Preceptuación', 'PREC', 'semanal'], ['Sacerdote', 'SACD', 'semanal']
 ]
 
 const uuid = () => (globalThis.crypto?.randomUUID?.() ?? 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36))
@@ -95,12 +96,13 @@ export function crearClienteDemo() {
       case 'accesos_permitidos': return u.admin || (u.rol === 'encargado' && r.asociacion_id === u.asoc)
       case 'permisos_preceptor': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || u.rol === 'preceptor')
       case 'preceptor_niveles': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.email === u.email)
-      case 'tipos_actividad': return r.asociacion_id === u.asoc
+      // Las familias no tienen acceso a Asistencia ni a sus actividades
+      case 'tipos_actividad': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || u.rol === 'preceptor')
       case 'socios': return puedeSocio(u, r, 'socios', 'ver') || (u.rol === 'familia' && esFamiliar(u, r.id))
       case 'periodos_alta': { const s = socioDe(r.socio_id); return !!s && (puedeSocio(u, s, 'socios', 'ver') || esFamiliar(u, s.id)) }
       case 'socios_bancarios': return u.rol === 'encargado' && socioDe(r.socio_id)?.asociacion_id === u.asoc
       case 'familiares_socios': return r.email === u.email || puedeSocio(u, socioDe(r.socio_id), 'socios', 'ver')
-      case 'registros_asistencia': { const s = socioDe(r.socio_id); return !!s && (puedeSocio(u, s, 'asistencia', 'ver') || esFamiliar(u, s.id)) }
+      case 'registros_asistencia': return puedeSocio(u, socioDe(r.socio_id), 'asistencia', 'ver')
       case 'global_admins': return u.admin
       default: return false
     }
@@ -137,15 +139,16 @@ export function crearClienteDemo() {
 
   function duplicada(tabla, f) {
     if (db[tabla].some(x => PK[tabla].every(k => x[k] === f[k]))) return true
-    if (tabla === 'tipos_actividad' && db[tabla].some(x => x.asociacion_id === f.asociacion_id && x.nombre === f.nombre)) return true
+    if (tabla === 'tipos_actividad' && db[tabla].some(x => x.asociacion_id === f.asociacion_id
+      && (x.nombre === f.nombre || (f.abreviatura && x.abreviatura === f.abreviatura)))) return true
     if (tabla === 'periodos_alta' && !f.fecha_baja && db[tabla].some(x => x.socio_id === f.socio_id && !x.fecha_baja)) return true
     return false
   }
 
   function efectosAlInsertar(tabla, f) {
     if (tabla === 'asociaciones')
-      TIPOS_POR_DEFECTO.forEach(([nombre, periodicidad], i) =>
-        db.tipos_actividad.push({ id: uuid(), asociacion_id: f.id, nombre, periodicidad, activa: true, orden: i + 1 }))
+      TIPOS_POR_DEFECTO.forEach(([nombre, abreviatura, periodicidad], i) =>
+        db.tipos_actividad.push({ id: uuid(), asociacion_id: f.id, nombre, abreviatura, periodicidad, activa: true, orden: i + 1 }))
   }
 
   function efectosAlBorrar(tabla, f) {

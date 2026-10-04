@@ -1,15 +1,34 @@
 // Cálculos puros de las estadísticas (sin React ni Supabase, para poder probarlos con node).
-import { NIVELES, edad } from '../util.js'
-import { inicioPeriodo, sumarPeriodos } from '../util.js'
+//
+// Modelo de asistencia: en cada periodo, cada socio figura como «No» hasta que se marca «Sí».
+// Solo se guardan las asistencias. El porcentaje es asistentes / socios del periodo, donde los socios
+// del periodo son los que estaban de alta en algún momento del mismo (más los que ya tengan asistencia).
+import { NIVELES, edad, inicioPeriodo, sumarPeriodos, finPeriodo, abrev } from '../util.js'
 
 const p2 = n => String(n).padStart(2, '0')
 
 export const estabaActivo = (s, f) =>
   (s.periodos_alta || []).some(p => p.fecha_alta <= f && (!p.fecha_baja || p.fecha_baja >= f))
 
+const elegible = (s, ini, fin) =>
+  (s.periodos_alta || []).some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= ini))
+
 const ultimoDia = ym => {
   const [y, m] = ym.split('-').map(Number)
   return `${ym}-${p2(new Date(y, m, 0).getDate())}`
+}
+
+// Inicio del curso en vigor: el 1 de septiembre más reciente
+export function inicioCurso(hoyIso) {
+  const [y, m] = hoyIso.split('-').map(Number)
+  return `${m >= 9 ? y : y - 1}-09-01`
+}
+
+// Meses que cubre un rango (el mes de inicio y el mes final cuentan)
+export function mesesDesde(desdeIso, hastaIso) {
+  const [dy, dm] = desdeIso.split('-').map(Number)
+  const [hy, hm] = hastaIso.split('-').map(Number)
+  return (hy - dy) * 12 + (hm - dm) + 1
 }
 
 // Los n meses que terminan en el mes de «hasta» (formato AAAA-MM)
@@ -81,7 +100,7 @@ export function porEdad(socios, hastaIso) {
   return { filas, sinFecha }
 }
 
-// Cuántos periodos de cada actividad cubre un rango de meses
+// Cuántos periodos de cada actividad cubre un rango de meses (solo para decidir cuántos datos pedir)
 export function periodosEnRango(per, meses) {
   if (per === 'semanal') return Math.round((meses * 52) / 12)
   if (per === 'mensual') return meses
@@ -108,54 +127,75 @@ const etiquetaCorta = (inicio, per) => {
   return String(y)
 }
 
-// Porcentaje de asistencia por periodo de una actividad: sí / (sí + no).
-// Los socios sin marcar no cuentan; un periodo sin marcas queda como hueco (pct = null).
-export function serieAsistencia(registros, tipo, hastaIso, n) {
-  const per = tipo.periodicidad
-  const act = inicioPeriodo(hastaIso, per)
-  const inicios = Array.from({ length: n }, (_, i) => sumarPeriodos(act, per, i - (n - 1)))
-  const mapa = new Map(inicios.map(i => [i, { si: 0, no: 0 }]))
+// Recorre cada periodo de cada actividad entre dos fechas y entrega, para cada uno, los socios que
+// cuentan en él y si asistieron: cb(tipo, inicioPeriodo, Map(socio_id -> asistió))
+function recorrer(registros, socios, tipos, desdeIso, hastaIso, cb) {
+  const idx = new Map()
   for (const r of registros) {
-    if (r.tipo_actividad_id !== tipo.id) continue
-    const c = mapa.get(r.periodo_inicio)
-    if (c) r.asistio ? c.si++ : c.no++
+    if (!r.asistio) continue
+    const k = `${r.tipo_actividad_id}|${r.periodo_inicio}`
+    if (!idx.has(k)) idx.set(k, new Set())
+    idx.get(k).add(r.socio_id)
   }
-  return inicios.map(inicio => {
-    const { si, no } = mapa.get(inicio)
-    const marcados = si + no
-    return { inicio, etiqueta: etiquetaCorta(inicio, per), si, no, marcados, pct: marcados ? Math.round((1000 * si) / marcados) / 10 : null }
-  })
+  for (const t of tipos) {
+    const per = t.periodicidad
+    const ultimo = inicioPeriodo(hastaIso, per)
+    for (let ini = inicioPeriodo(desdeIso, per); ini <= ultimo; ini = sumarPeriodos(ini, per, 1)) {
+      const fin = finPeriodo(ini, per)
+      const marcados = idx.get(`${t.id}|${ini}`)
+      const part = new Map()
+      for (const s of socios) {
+        const asistio = !!marcados?.has(s.id)
+        if (asistio || elegible(s, ini, fin)) part.set(s.id, asistio)
+      }
+      cb(t, ini, part)
+    }
+  }
 }
 
-// Asistencia media (%) por nivel y actividad desde una fecha
-export function matrizNivelActividad(registros, socios, tipos, desdeIso) {
+// Porcentaje de asistencia por periodo de una actividad. Un periodo sin socios queda como hueco (pct = null).
+export function serieAsistencia(registros, socios, tipo, desdeIso, hastaIso) {
+  const out = []
+  recorrer(registros, socios, [tipo], desdeIso, hastaIso, (t, inicio, part) => {
+    let si = 0
+    for (const v of part.values()) if (v) si++
+    const total = part.size
+    out.push({
+      inicio, etiqueta: etiquetaCorta(inicio, t.periodicidad), si, total,
+      pct: total ? Math.round((1000 * si) / total) / 10 : null
+    })
+  })
+  return out
+}
+
+// Asistencia media (%) por nivel y actividad en un rango de fechas
+export function matrizNivelActividad(registros, socios, tipos, desdeIso, hastaIso) {
   const nivelDe = new Map(socios.map(s => [s.id, s.nivel || 'Sin nivel']))
-  const acc = new Map() // `${tipoId}|${nivel}` -> {si, no}
-  for (const r of registros) {
-    if (r.periodo_inicio < desdeIso) continue
-    const nivel = nivelDe.get(r.socio_id)
-    if (nivel === undefined) continue
-    const k = `${r.tipo_actividad_id}|${nivel}`
-    const c = acc.get(k) || { si: 0, no: 0 }
-    r.asistio ? c.si++ : c.no++
-    acc.set(k, c)
-  }
+  const acc = new Map() // `${tipoId}|${nivel}` -> {si, total}
+  recorrer(registros, socios, tipos, desdeIso, hastaIso, (t, _ini, part) => {
+    for (const [id, asistio] of part) {
+      const k = `${t.id}|${nivelDe.get(id)}`
+      const c = acc.get(k) || { si: 0, total: 0 }
+      c.total++; if (asistio) c.si++
+      acc.set(k, c)
+    }
+  })
   const niveles = [...new Set([...acc.keys()].map(k => k.split('|').slice(1).join('|')))].sort(ordenNivel)
   const usados = tipos.filter(t => niveles.some(n => acc.has(`${t.id}|${n}`)))
   const celdas = []
   usados.forEach((t, x) => niveles.forEach((nv, y) => {
     const c = acc.get(`${t.id}|${nv}`)
-    if (c) celdas.push({ x, y, pct: Math.round((1000 * c.si) / (c.si + c.no)) / 10, si: c.si, marcados: c.si + c.no })
+    if (c) celdas.push({ x, y, pct: Math.round((1000 * c.si) / c.total) / 10, si: c.si, total: c.total })
   }))
-  return { tipos: usados.map(t => t.nombre), niveles, celdas }
+  return { abrevs: usados.map(abrev), nombres: usados.map(t => t.nombre), niveles, celdas }
 }
 
-// Asistencia media global (%) desde una fecha
-export function asistenciaMedia(registros, desdeIso) {
-  let si = 0, tot = 0
-  for (const r of registros) {
-    if (r.periodo_inicio < desdeIso) continue
-    tot++; if (r.asistio) si++
-  }
-  return tot ? Math.round((1000 * si) / tot) / 10 : null
+// Asistencia media global (%) en un rango de fechas
+export function asistenciaMedia(registros, socios, tipos, desdeIso, hastaIso) {
+  let si = 0, total = 0
+  recorrer(registros, socios, tipos, desdeIso, hastaIso, (_t, _ini, part) => {
+    total += part.size
+    for (const v of part.values()) if (v) si++
+  })
+  return total ? Math.round((1000 * si) / total) / 10 : null
 }

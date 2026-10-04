@@ -32,11 +32,12 @@ const NIVELES_SEMBRADOS = [
   ['3º ESO', 7, 14], ['4º ESO', 5, 15], ['1º Bachillerato', 3, 16]
 ]
 
+// [id, nombre, abreviatura, periodicidad, probabilidad media de asistir]
 const TIPOS = [
-  ['t-charla', 'Charla', 'semanal', 0.82], ['t-circulo', 'Círculo', 'semanal', 0.78],
-  ['t-visita', 'Visita de pobres', 'mensual', 0.55], ['t-retiro', 'Retiro mensual', 'mensual', 0.62],
-  ['t-curso', 'Curso de retiro', 'anual', 0.7], ['t-precept', 'Preceptuación', 'semanal', 0.86],
-  ['t-sacerdote', 'Sacerdote', 'semanal', 0.72]
+  ['t-charla', 'Charla', 'CHAR', 'semanal', 0.82], ['t-circulo', 'Círculo', 'CIRC', 'semanal', 0.78],
+  ['t-visita', 'Visita de pobres', 'VIPO', 'mensual', 0.55], ['t-retiro', 'Retiro mensual', 'RTME', 'mensual', 0.62],
+  ['t-curso', 'Curso de retiro', 'CRT', 'anual', 0.7], ['t-precept', 'Preceptuación', 'PREC', 'semanal', 0.86],
+  ['t-sacerdote', 'Sacerdote', 'SACD', 'semanal', 0.72]
 ]
 
 export const USUARIOS_DEMO = {
@@ -95,8 +96,8 @@ export function crearBD() {
       { asociacion_id: ASOC, email: 'preceptor@demo.es', nivel: '2º ESO' },
       { asociacion_id: ASOC, email: 'preceptor2@demo.es', nivel: '3º ESO' }
     ],
-    tipos_actividad: TIPOS.map(([id, nombre, periodicidad], i) => ({
-      id, asociacion_id: ASOC, nombre, periodicidad, activa: true, orden: i + 1
+    tipos_actividad: TIPOS.map(([id, nombre, abreviatura, periodicidad], i) => ({
+      id, asociacion_id: ASOC, nombre, abreviatura, periodicidad, activa: true, orden: i + 1
     })),
     socios: [], periodos_alta: [], socios_bancarios: [], familiares_socios: [], registros_asistencia: []
   }
@@ -152,7 +153,8 @@ export function crearBD() {
   const desde = inicioPeriodo(restarMeses(H, 24, 1), 'semanal')
   const periodosPorSocio = Object.fromEntries(db.socios.map(s => [s.id, db.periodos_alta.filter(p => p.socio_id === s.id)]))
 
-  for (const [tipoId, , per, tasa] of TIPOS) {
+  // Como en la app real, solo se guardan las asistencias: sin registro significa que no asistió
+  for (const [tipoId, , , per, tasa] of TIPOS) {
     const actual = inicioPeriodo(H, per)
     for (let ini = inicioPeriodo(desde, per); ini <= actual; ini = sumarPeriodos(ini, per, 1)) {
       const fin = finPeriodo(ini, per)
@@ -161,13 +163,10 @@ export function crearBD() {
       for (const s of db.socios) {
         const activo = periodosPorSocio[s.id].some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= ini))
         if (!activo) continue
-        // El periodo en curso casi no tiene marcas: así se ve el estado «sin marcar» de partida
-        const pMarca = ini === actual ? 0.15 : verano ? 0.4 : 0.93
-        if (r() > pMarca) continue
-        const pAsiste = Math.min(0.98, tasa * propension[s.id] * (verano ? 0.65 : 1))
-        db.registros_asistencia.push({
-          socio_id: s.id, tipo_actividad_id: tipoId, periodo_inicio: ini, asistio: r() < pAsiste
-        })
+        // En verano casi no hay actividad semanal; el periodo en curso aún tiene pocas asistencias marcadas
+        const pAsiste = Math.min(0.98, tasa * propension[s.id] * (verano ? 0.6 : 1) * (ini === actual ? 0.3 : 1))
+        if (r() < pAsiste)
+          db.registros_asistencia.push({ socio_id: s.id, tipo_actividad_id: tipoId, periodo_inicio: ini, asistio: true })
       }
     }
   }

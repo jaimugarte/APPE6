@@ -36,6 +36,13 @@ export function ibanValido(s) {
   return resto === 1
 }
 
+// Abreviatura de una actividad: la configurada o, si no hay, las 4 primeras letras del nombre
+export const abrev = t =>
+  (t.abreviatura || t.nombre.normalize('NFD').replace(/[^A-Za-z]/g, '').slice(0, 4)).toUpperCase()
+
+// Normaliza lo que escribe el encargado: mayúsculas, sin espacios, máximo 6 caracteres
+export const limpiarAbrev = s => (s || '').replace(/\s+/g, '').toUpperCase().slice(0, 6)
+
 export const esEmail = s => !s || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
 // ---------- Periodos de actividad ----------

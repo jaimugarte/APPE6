@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { hoy } from './util'
+import { hoy, abrev } from './util'
 import Grafico from './estadisticas/Grafico'
 import * as calc from './estadisticas/calculos'
 import * as op from './estadisticas/opciones'
@@ -19,7 +19,7 @@ async function paginar(construir) {
 
 export default function Estadisticas({ asoc, rol }) {
   const [permiso, setPermiso] = useState(rol === 'encargado' ? true : rol === 'preceptor' ? null : false)
-  const [meses, setMeses] = useState(12)
+  const [rango, setRango] = useState('curso') // 'curso' = desde el 1 de septiembre, o un número de meses
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
   const [tipoId, setTipoId] = useState(null)
@@ -38,7 +38,7 @@ export default function Estadisticas({ asoc, rol }) {
     ;(async () => {
       try {
         const { data: tipos, error: e1 } = await supabase.from('tipos_actividad')
-          .select('id, nombre, periodicidad').eq('asociacion_id', asoc).eq('activa', true)
+          .select('id, nombre, abreviatura, periodicidad').eq('asociacion_id', asoc).eq('activa', true)
           .order('orden').order('nombre')
         if (e1) throw e1
         const socios = await paginar(() => supabase.from('socios')
@@ -57,18 +57,21 @@ export default function Estadisticas({ asoc, rol }) {
     return () => { vigente = false }
   }, [asoc, permiso, H])
 
-  const desdeRango = `${calc.ultimosMeses(H, meses)[0]}-01`
+  const desdeRango = rango === 'curso' ? calc.inicioCurso(H) : `${calc.ultimosMeses(H, rango)[0]}-01`
+  const meses = rango === 'curso' ? calc.mesesDesde(desdeRango, H) : rango
+  const corto = rango === 'curso' ? 'curso' : `${rango} meses`
   const tipo = datos?.tipos.find(t => t.id === tipoId)
 
   const serie = useMemo(() => datos && calc.serieSocios(datos.socios, H, meses), [datos, meses, H])
   const niveles = useMemo(() => datos && calc.porNivel(datos.socios, H), [datos, H])
   const edades = useMemo(() => datos && calc.porEdad(datos.socios, H), [datos, H])
   const asis = useMemo(() => datos && tipo
-    ? calc.serieAsistencia(datos.registros, tipo, H, calc.periodosEnRango(tipo.periodicidad, meses)) : null,
-    [datos, tipo, meses, H])
-  const mapa = useMemo(() => datos && calc.matrizNivelActividad(datos.registros, datos.socios, datos.tipos, desdeRango),
-    [datos, desdeRango])
-  const media = useMemo(() => datos && calc.asistenciaMedia(datos.registros, desdeRango), [datos, desdeRango])
+    ? calc.serieAsistencia(datos.registros, datos.socios, tipo, desdeRango, H) : null,
+    [datos, tipo, desdeRango, H])
+  const mapa = useMemo(() => datos && calc.matrizNivelActividad(datos.registros, datos.socios, datos.tipos, desdeRango, H),
+    [datos, desdeRango, H])
+  const media = useMemo(() => datos && calc.asistenciaMedia(datos.registros, datos.socios, datos.tipos, desdeRango, H),
+    [datos, desdeRango, H])
 
   // Opciones de los gráficos: todos los hooks van antes de cualquier return anticipado
   const oActivos = useMemo(() => serie && op.opcionActivos(serie), [serie])
@@ -92,7 +95,8 @@ export default function Estadisticas({ asoc, rol }) {
       <div className="barra">
         <h2>Estadísticas</h2>
         <label className="fila">Periodo
-          <select value={meses} onChange={e => setMeses(Number(e.target.value))}>
+          <select value={rango} onChange={e => setRango(e.target.value === 'curso' ? 'curso' : Number(e.target.value))}>
+            <option value="curso">Desde inicio de curso (1 sept)</option>
             <option value={6}>Últimos 6 meses</option>
             <option value={12}>Últimos 12 meses</option>
             <option value={24}>Últimos 24 meses</option>
@@ -102,8 +106,8 @@ export default function Estadisticas({ asoc, rol }) {
 
       <div className="kpis">
         <div className="kpi"><span>Socios activos</span><b>{activos}</b></div>
-        <div className="kpi"><span>Altas ({meses} meses)</span><b>{altas}</b></div>
-        <div className="kpi"><span>Bajas ({meses} meses)</span><b>{bajas}</b></div>
+        <div className="kpi"><span>Altas ({corto})</span><b>{altas}</b></div>
+        <div className="kpi"><span>Bajas ({corto})</span><b>{bajas}</b></div>
         <div className="kpi"><span>Asistencia media</span><b>{media == null ? '—' : `${media}%`}</b></div>
       </div>
 
@@ -118,33 +122,34 @@ export default function Estadisticas({ asoc, rol }) {
       </Tarjeta>
 
       <Tarjeta titulo="Asistencia por actividad"
-        subtitulo="% de socios marcados que asistieron. Los socios sin marcar no cuentan"
+        subtitulo={tipo ? `${tipo.nombre}: % de socios que asistieron en cada periodo` : '% de socios que asistieron en cada periodo'}
         extra={datos.tipos.length > 0 && (
           <div className="chips tipos">
             {datos.tipos.map(t => (
-              <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} onClick={() => setTipoId(t.id)}>
-                {t.nombre} <small>{t.periodicidad}</small>
+              <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} title={t.nombre}
+                aria-label={`${t.nombre}, ${t.periodicidad}`} aria-pressed={t.id === tipoId} onClick={() => setTipoId(t.id)}>
+                {abrev(t)}
               </button>
             ))}
           </div>
         )}
-        tabla={asis && { cab: ['Periodo', 'Asistieron', 'Marcados', '%'],
-          filas: asis.map(s => [s.etiqueta, s.si, s.marcados, s.pct == null ? '—' : `${s.pct}%`]) }}>
+        tabla={asis && { cab: ['Periodo', 'Asistieron', 'Socios', '%'],
+          filas: asis.map(s => [s.etiqueta, s.si, s.total, s.pct == null ? '—' : `${s.pct}%`]) }}>
         {asis
           ? <Grafico option={oAsis} etiqueta={`Asistencia a ${tipo.nombre}`} />
           : <p className="aviso">No hay actividades activas.</p>}
       </Tarjeta>
 
       <Tarjeta titulo="Asistencia por nivel y actividad" subtitulo="Media del periodo seleccionado"
-        tabla={mapa.celdas.length ? { cab: ['Nivel', ...mapa.tipos],
-          filas: mapa.niveles.map((nv, y) => [nv, ...mapa.tipos.map((_, x) => {
+        tabla={mapa.celdas.length ? { cab: ['Nivel', ...mapa.abrevs],
+          filas: mapa.niveles.map((nv, y) => [nv, ...mapa.abrevs.map((_, x) => {
             const c = mapa.celdas.find(k => k.x === x && k.y === y)
             return c ? `${c.pct}%` : '—'
           })]) } : null}>
         {oMapa
           ? <Grafico option={oMapa} alto={mapa.niveles.length * 34 + 110}
               etiqueta="Asistencia media por nivel y actividad" />
-          : <p className="aviso">Todavía no hay asistencia registrada en este periodo.</p>}
+          : <p className="aviso">Todavía no hay datos de asistencia en este periodo.</p>}
       </Tarjeta>
 
       <Tarjeta titulo="Socios por nivel" subtitulo="Socios activos hoy"

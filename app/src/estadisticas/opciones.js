@@ -112,7 +112,7 @@ export function opcionAsistencia(serie) {
     tooltip: tip('axis', ps => {
       const s = ps[0]?.data?.s
       if (!s || s.pct == null) return ''
-      return `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}${s.pct}% · ${s.si} de ${s.marcados} marcados`
+      return `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}${s.pct}%: ${s.si} de ${s.total} socios`
     }, 'shadow'),
     xAxis: ejeX(serie.map(s => s.etiqueta)),
     yAxis: ejeY({ min: 0, max: 100, interval: 25, axisLabel: { color: C.mudo, formatter: '{value}%' } }),
@@ -167,12 +167,12 @@ export function opcionMapaCalor(m) {
   }))
   return {
     ...base(),
-    grid: { left: 8, right: 8, top: 8, bottom: 78, containLabel: true },
+    grid: { left: 8, right: 8, top: 8, bottom: 64, containLabel: true },
     tooltip: tip('item', p =>
-      `<b>${esc(m.tipos[p.value[0]])}</b> · ${esc(m.niveles[p.value[1]])}<br/>${punto(C.s1)}${p.value[2]}% (${p.data.c.si} de ${p.data.c.marcados})`),
+      `<b>${esc(m.nombres[p.value[0]])}</b>, ${esc(m.niveles[p.value[1]])}<br/>${punto(C.s1)}${p.value[2]}% (${p.data.c.si} de ${p.data.c.total})`),
     xAxis: {
-      type: 'category', data: m.tipos, axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { color: C.texto2, interval: 0, width: 64, overflow: 'break', fontSize: 11 }
+      type: 'category', data: m.abrevs, axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: C.texto2, interval: 0, fontSize: 11, fontWeight: 600 }
     },
     yAxis: {
       type: 'category', data: m.niveles, inverse: true, axisLine: { show: false }, axisTick: { show: false },

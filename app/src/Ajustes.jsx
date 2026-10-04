@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Permisos from './Permisos'
+import { abrev, limpiarAbrev } from './util'
 
 export default function Ajustes({ asoc, apps, uid, recargar }) {
   const [tipos, setTipos] = useState([])
@@ -8,6 +9,8 @@ export default function Ajustes({ asoc, apps, uid, recargar }) {
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState('preceptor')
   const [nombre, setNombre] = useState('')
+  const [abrNueva, setAbrNueva] = useState('')
+  const [edicion, setEdicion] = useState({}) // id -> abreviatura que se está escribiendo
   const [per, setPer] = useState('semanal')
   const [msg, setMsg] = useState('')
 
@@ -22,11 +25,34 @@ export default function Ajustes({ asoc, apps, uid, recargar }) {
     setMsg(error?.message || ''); recargar()
   }
   const toggleTipo = async (id, v) => { await supabase.from('tipos_actividad').update({ activa: v }).eq('id', id); cargar() }
+  // Comprueba que la abreviatura tenga entre 2 y 6 caracteres y no esté ya usada por otra actividad
+  const errorAbrev = (valor, idPropio) => {
+    if (valor.length < 2) return 'La abreviatura debe tener entre 2 y 6 caracteres.'
+    if (tipos.some(t => t.id !== idPropio && abrev(t) === valor)) return `La abreviatura ${valor} ya la usa otra actividad.`
+    return ''
+  }
+  const guardarAbrev = async t => {
+    if (edicion[t.id] === undefined) return
+    const valor = limpiarAbrev(edicion[t.id])
+    const sinCambio = valor === abrev(t)
+    const fallo = sinCambio ? '' : errorAbrev(valor, t.id)
+    setEdicion(({ [t.id]: _, ...resto }) => resto)
+    if (sinCambio) return
+    if (fallo) return setMsg(fallo)
+    const { error } = await supabase.from('tipos_actividad').update({ abreviatura: valor }).eq('id', t.id)
+    setMsg(error?.code === '23505' ? `La abreviatura ${valor} ya la usa otra actividad.` : error?.message || '')
+    cargar()
+  }
   const addTipo = async () => {
     if (!nombre.trim()) return
+    const candidata = limpiarAbrev(abrNueva) || abrev({ nombre })
+    const fallo = errorAbrev(candidata, null)
+    if (fallo) return setMsg(fallo)
     const { error } = await supabase.from('tipos_actividad')
-      .insert({ asociacion_id: asoc, nombre: nombre.trim(), periodicidad: per, orden: 99 })
-    setMsg(error?.message || ''); setNombre(''); cargar()
+      .insert({ asociacion_id: asoc, nombre: nombre.trim(), abreviatura: candidata, periodicidad: per, orden: 99 })
+    setMsg(error?.code === '23505' ? 'Ya existe una actividad con ese nombre o esa abreviatura.' : error?.message || '')
+    if (!error) { setNombre(''); setAbrNueva('') }
+    cargar()
   }
   const addAcceso = async () => {
     if (!email.trim()) return
@@ -52,14 +78,23 @@ export default function Ajustes({ asoc, apps, uid, recargar }) {
 
       <section>
         <h2>Actividades de interés</h2>
+        <p className="sub">Marca las que quieres usar. La abreviatura es lo que se muestra en el móvil.</p>
         {tipos.map(t => (
-          <label key={t.id} className="fila">
-            <input type="checkbox" checked={t.activa} onChange={e => toggleTipo(t.id, e.target.checked)} />
-            {t.nombre} <small>({t.periodicidad})</small>
-          </label>
+          <div key={t.id} className="actividad">
+            <label className="fila">
+              <input type="checkbox" checked={t.activa} onChange={e => toggleTipo(t.id, e.target.checked)} />
+              <span>{t.nombre} <small>{t.periodicidad}</small></span>
+            </label>
+            <input className="abrev" maxLength={6} aria-label={`Abreviatura de ${t.nombre}`}
+              value={edicion[t.id] ?? abrev(t)}
+              onChange={e => setEdicion({ ...edicion, [t.id]: limpiarAbrev(e.target.value) })}
+              onBlur={() => guardarAbrev(t)} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
+          </div>
         ))}
-        <div className="fila">
+        <div className="fila nueva-actividad">
           <input placeholder="Nueva actividad" value={nombre} onChange={e => setNombre(e.target.value)} />
+          <input className="abrev" maxLength={6} aria-label="Abreviatura de la nueva actividad" placeholder={nombre ? abrev({ nombre }) : 'Abrev.'}
+            value={abrNueva} onChange={e => setAbrNueva(limpiarAbrev(e.target.value))} />
           <select value={per} onChange={e => setPer(e.target.value)}>
             {['semanal', 'mensual', 'trimestral', 'anual'].map(p => <option key={p}>{p}</option>)}
           </select>

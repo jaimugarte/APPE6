@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodo } from './util'
+import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodo, abrev } from './util'
 
 const CONFLICTO = 'socio_id,tipo_actividad_id,periodo_inicio'
 
-export default function Asistencia({ asoc, rol, email }) {
+// La familia nunca accede a Asistencia, ni siquiera a los datos de sus hijos
+export default function Asistencia(props) {
+  if (props.rol === 'familia')
+    return <main><p className="aviso">La asistencia solo está disponible para el equipo de la asociación.</p></main>
+  return <PantallaAsistencia {...props} />
+}
+
+// Modelo: cada socio figura como «No» en cada periodo hasta que se marca «Sí».
+// Solo se guardan las asistencias; pasar a «No» borra el registro.
+function PantallaAsistencia({ asoc, rol, email }) {
   const [tipos, setTipos] = useState(null)
   const [socios, setSocios] = useState(null)
   const [perm, setPerm] = useState(null)
   const [tipoId, setTipoId] = useState(null)
   const [inicio, setInicio] = useState(null)
-  const [marcas, setMarcas] = useState({}) // socio_id -> true | false (sin entrada = sin marcar)
+  const [marcas, setMarcas] = useState({}) // socio_id -> true (asistió)
   const [nivel, setNivel] = useState('')
   const [q, setQ] = useState('')
   const [msg, setMsg] = useState('')
@@ -46,7 +55,7 @@ export default function Asistencia({ asoc, rol, email }) {
   // Al elegir una actividad se muestra siempre el periodo actual
   const seleccionar = t => { setTipoId(t.id); setInicio(inicioPeriodo(hoy(), t.periodicidad)) }
 
-  // Marcas del periodo mostrado
+  // Asistencias del periodo mostrado
   useEffect(() => {
     if (!tipoId || !inicio) return
     let vigente = true
@@ -56,16 +65,16 @@ export default function Asistencia({ asoc, rol, email }) {
       .then(({ data, error }) => {
         if (!vigente) return
         setMsg(error?.message || '')
-        setMarcas(Object.fromEntries((data || []).map(r => [r.socio_id, r.asistio])))
+        setMarcas(Object.fromEntries((data || []).filter(r => r.asistio).map(r => [r.socio_id, true])))
       })
     return () => { vigente = false }
   }, [tipoId, inicio])
 
-  // Socios que estaban de alta en algún momento del periodo (o que ya tienen marca)
+  // Socios que estaban de alta en algún momento del periodo (o que ya tienen asistencia marcada)
   const delPeriodo = useMemo(() => {
     if (!socios || !inicio) return []
     return socios.filter(s =>
-      marcas[s.id] !== undefined ||
+      marcas[s.id] ||
       (s.periodos_alta || []).some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= inicio)))
   }, [socios, inicio, fin, marcas])
 
@@ -79,77 +88,71 @@ export default function Asistencia({ asoc, rol, email }) {
       (!nivel || s.nivel === nivel) && (!t || `${s.nombre} ${s.apellidos}`.toLowerCase().includes(t)))
   }, [delPeriodo, nivel, q])
 
-  const asistieron = lista.filter(s => marcas[s.id] === true).length
-  const faltaron = lista.filter(s => marcas[s.id] === false).length
-  const pendientes = lista.length - asistieron - faltaron
+  const asistieron = lista.filter(s => marcas[s.id]).length
 
-  const poner = (ids, valor) => setMarcas(m => {
+  const poner = (ids, si) => setMarcas(m => {
     const c = { ...m }
-    for (const id of ids) { if (valor === undefined) delete c[id]; else c[id] = valor }
+    for (const id of ids) { if (si) c[id] = true; else delete c[id] }
     return c
   })
 
-  // Pulsar «Sí» o «No»; volver a pulsar el activo lo deja sin marcar
-  const marcar = async (id, valor) => {
-    const previo = marcas[id]
-    const nuevo = previo === valor ? undefined : valor
-    poner([id], nuevo)
-    let error, borradas
-    if (nuevo === undefined) {
+  const filaDe = id => ({ socio_id: id, tipo_actividad_id: tipoId, periodo_inicio: inicio, asistio: true })
+
+  // Sí: guarda la asistencia. No: borra el registro (sin registro = no asistió)
+  const marcar = async (id, si) => {
+    if (!!marcas[id] === si) return
+    poner([id], si)
+    let error
+    if (si) {
+      ;({ error } = await supabase.from('registros_asistencia').upsert(filaDe(id), { onConflict: CONFLICTO }))
+    } else {
       const r = await supabase.from('registros_asistencia').delete()
         .eq('socio_id', id).eq('tipo_actividad_id', tipoId).eq('periodo_inicio', inicio).select('socio_id')
-      error = r.error; borradas = r.data?.length
-      if (!error && !borradas) error = { message: 'No tienes permiso para modificar este registro.' }
-    } else {
-      const r = await supabase.from('registros_asistencia').upsert(
-        { socio_id: id, tipo_actividad_id: tipoId, periodo_inicio: inicio, asistio: nuevo },
-        { onConflict: CONFLICTO })
-      error = r.error
+      error = r.error || (r.data?.length ? null : { message: 'No tienes permiso para modificar este registro.' })
     }
-    if (error) { poner([id], previo); setMsg(error.message) } else setMsg('')
+    if (error) { poner([id], !si); setMsg(error.message) } else setMsg('')
   }
 
-  // Acción en bloque sobre los socios visibles que aún no están marcados
-  const marcarResto = async valor => {
-    const ids = lista.filter(s => marcas[s.id] === undefined).map(s => s.id)
+  // Acciones en bloque sobre los socios que se ven en la lista
+  const todosSi = async () => {
+    const ids = lista.filter(s => !marcas[s.id]).map(s => s.id)
     if (!ids.length) return
-    poner(ids, valor)
-    const { error } = await supabase.from('registros_asistencia').upsert(
-      ids.map(socio_id => ({ socio_id, tipo_actividad_id: tipoId, periodo_inicio: inicio, asistio: valor })),
-      { onConflict: CONFLICTO })
-    if (error) { poner(ids, undefined); setMsg(error.message) } else setMsg('')
+    poner(ids, true)
+    const { error } = await supabase.from('registros_asistencia').upsert(ids.map(filaDe), { onConflict: CONFLICTO })
+    if (error) { poner(ids, false); setMsg(error.message) } else setMsg('')
   }
 
-  const limpiar = async () => {
-    const ids = lista.filter(s => marcas[s.id] !== undefined).map(s => s.id)
-    if (!ids.length || !window.confirm(`¿Quitar la marca de ${ids.length} socios en este periodo?`)) return
-    const previas = Object.fromEntries(ids.map(id => [id, marcas[id]]))
-    poner(ids, undefined)
+  const ninguno = async () => {
+    const ids = lista.filter(s => marcas[s.id]).map(s => s.id)
+    if (!ids.length || !window.confirm(`¿Poner «No» a ${ids.length} socios en este periodo?`)) return
+    poner(ids, false)
     const { data, error } = await supabase.from('registros_asistencia').delete()
       .eq('tipo_actividad_id', tipoId).eq('periodo_inicio', inicio).in('socio_id', ids).select('socio_id')
     if (error || data?.length !== ids.length) {
-      setMarcas(m => ({ ...m, ...previas }))
-      setMsg(error?.message || 'No se pudieron quitar todas las marcas (revisa tus permisos).')
+      poner(ids, true)
+      setMsg(error?.message || 'No se pudieron cambiar todos (revisa tus permisos).')
     } else setMsg('')
   }
 
   if (tipos === null || socios === null) return <main><p>Cargando…</p></main>
 
   if (tipos.length === 0)
-    return <main><p className="aviso">No hay actividades activas{esEncargado && ': defínelas en Ajustes → Actividades de interés'}.</p></main>
+    return <main><p className="aviso">No hay actividades activas{esEncargado && ': defínelas en Ajustes'}.</p></main>
 
   return (
-    <main>
+    <main className="asistencia">
       <div className="chips tipos">
         {tipos.map(t => (
-          <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} onClick={() => seleccionar(t)}>
-            {t.nombre} <small>{t.periodicidad}</small>
+          <button key={t.id} className={'chip tipo' + (t.id === tipoId ? ' on' : '')} title={t.nombre}
+            aria-label={`${t.nombre}, ${t.periodicidad}`} aria-pressed={t.id === tipoId} onClick={() => seleccionar(t)}>
+            {abrev(t)}
           </button>
         ))}
       </div>
 
       {tipo && inicio && (
         <>
+          <p className="act-nombre"><b>{tipo.nombre}</b> <small>{tipo.periodicidad}</small></p>
           <div className="navperiodo">
             <button aria-label="Periodo anterior" onClick={() => setInicio(sumarPeriodos(inicio, per, -1))}>‹</button>
             <div className="etiqueta">
@@ -178,17 +181,13 @@ export default function Asistencia({ asoc, rol, email }) {
 
           <div className="resumen">
             <span><b>{asistieron}</b> asistieron</span>
-            <span><b>{faltaron}</b> no asistieron</span>
-            <span><b>{pendientes}</b> sin marcar</span>
+            <span><b>{lista.length - asistieron}</b> no asistieron</span>
           </div>
-          {puedeEditar && lista.length > 0 &&
-            <p className="sub">Toca Sí o No para marcar. El tercer botón deja al socio sin marcar.</p>}
 
           {puedeEditar && lista.length > 0 && (
             <div className="fila">
-              <button disabled={!pendientes} onClick={() => marcarResto(true)}>Resto: asistió</button>
-              <button disabled={!pendientes} onClick={() => marcarResto(false)}>Resto: no asistió</button>
-              <button disabled={pendientes === lista.length} onClick={limpiar}>Limpiar</button>
+              <button disabled={asistieron === lista.length} onClick={todosSi}>Todos: Sí</button>
+              <button disabled={asistieron === 0} onClick={ninguno}>Todos: No</button>
             </div>
           )}
 
@@ -205,14 +204,10 @@ export default function Asistencia({ asoc, rol, email }) {
                 <small>{s.nivel}</small>
               </span>
               <span className="seg" role="group" aria-label={`Asistencia de ${s.nombre}`}>
-                <button className={marcas[s.id] === true ? 'on si' : ''} disabled={!puedeEditar}
-                  aria-pressed={marcas[s.id] === true} onClick={() => marcar(s.id, true)}>Sí</button>
-                <button className={marcas[s.id] === false ? 'on no' : ''} disabled={!puedeEditar}
-                  aria-pressed={marcas[s.id] === false} onClick={() => marcar(s.id, false)}>No</button>
-                {/* Tercer estado: sin marcar. Es el de partida y se puede volver a él en cualquier momento */}
-                <button className={'pend' + (marcas[s.id] === undefined ? ' on' : '')} disabled={!puedeEditar}
-                  aria-pressed={marcas[s.id] === undefined} aria-label="Sin marcar" title="Sin marcar"
-                  onClick={() => marcas[s.id] !== undefined && marcar(s.id, marcas[s.id])}>–</button>
+                <button className={marcas[s.id] ? 'on si' : ''} disabled={!puedeEditar}
+                  aria-pressed={!!marcas[s.id]} onClick={() => marcar(s.id, true)}>Sí</button>
+                <button className={!marcas[s.id] ? 'on no' : ''} disabled={!puedeEditar}
+                  aria-pressed={!marcas[s.id]} onClick={() => marcar(s.id, false)}>No</button>
               </span>
             </div>
           ))}

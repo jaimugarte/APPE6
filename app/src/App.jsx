@@ -96,10 +96,12 @@ export default function App() {
   const { perfil, mem, apps, permisos } = ctx
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
+  // Las familias nunca ven Asistencia ni Estadísticas; sí el resto de apps (socios, anuncios, fotos…)
+  const SOLO_EQUIPO = ['asistencia', 'estadisticas']
   const visible = a => esEncargado
     || (mem?.rol === 'preceptor'
       ? !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver
-      : a.app_clave !== 'estadisticas') // las familias no ven estadísticas
+      : !SOLO_EQUIPO.includes(a.app_clave))
   const activas = apps.filter(a => a.activa && visible(a))
 
   return (
