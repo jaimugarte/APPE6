@@ -155,7 +155,7 @@ export default function Estadisticas({ asoc, rol }) {
           : <p className="aviso">No hay socios activos.</p>}
       </Tarjeta>
 
-      <Tarjeta titulo="Edades" subtitulo={`Socios activos hoy, en años${edades.sinFecha ? ` · ${edades.sinFecha} sin fecha de nacimiento` : ''}`}
+      <Tarjeta titulo="Edades" subtitulo={`Socios activos hoy, en años${edades.sinFecha ? `. ${edades.sinFecha} sin fecha de nacimiento` : ''}`}
         tabla={{ cab: ['Edad', 'Socios'], filas: edades.filas.map(e => [e.edad, e.n]) }}>
         {oEdades
           ? <Grafico option={oEdades} etiqueta="Distribución de edades" />

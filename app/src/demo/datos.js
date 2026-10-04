@@ -161,7 +161,8 @@ export function crearBD() {
       for (const s of db.socios) {
         const activo = periodosPorSocio[s.id].some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= ini))
         if (!activo) continue
-        const pMarca = ini === actual ? 0.5 : verano ? 0.4 : 0.93
+        // El periodo en curso casi no tiene marcas: así se ve el estado «sin marcar» de partida
+        const pMarca = ini === actual ? 0.15 : verano ? 0.4 : 0.93
         if (r() > pMarca) continue
         const pAsiste = Math.min(0.98, tasa * propension[s.id] * (verano ? 0.65 : 1))
         db.registros_asistencia.push({

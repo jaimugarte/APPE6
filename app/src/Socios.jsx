@@ -99,7 +99,10 @@ export default function Socios({ asoc, rol, email }) {
           <button key={s.id} className="item" onClick={() => setSel(s.id)}>
             <span>
               <b>{s.apellidos}, {s.nombre}</b>
-              <small>{[s.nivel, a != null && `${a} años`].filter(Boolean).join(' · ')}</small>
+              <small className="meta">
+                {s.nivel && <span>{s.nivel}</span>}
+                {a != null && <span>{a} años</span>}
+              </small>
             </span>
             <span className={abierto(s) ? 'badge ok' : 'badge baja'}>{abierto(s) ? 'Alta' : 'Baja'}</span>
           </button>

@@ -176,10 +176,13 @@ export default function Asistencia({ asoc, rol, email }) {
             </select>
           </div>
 
-          <p className="resumen">
-            <b>{asistieron}</b> asistieron · <b>{faltaron}</b> no · <b>{pendientes}</b> sin marcar
-            <small> (de {lista.length})</small>
-          </p>
+          <div className="resumen">
+            <span><b>{asistieron}</b> asistieron</span>
+            <span><b>{faltaron}</b> no asistieron</span>
+            <span><b>{pendientes}</b> sin marcar</span>
+          </div>
+          {puedeEditar && lista.length > 0 &&
+            <p className="sub">Toca Sí o No para marcar. El tercer botón deja al socio sin marcar.</p>}
 
           {puedeEditar && lista.length > 0 && (
             <div className="fila">
@@ -206,6 +209,10 @@ export default function Asistencia({ asoc, rol, email }) {
                   aria-pressed={marcas[s.id] === true} onClick={() => marcar(s.id, true)}>Sí</button>
                 <button className={marcas[s.id] === false ? 'on no' : ''} disabled={!puedeEditar}
                   aria-pressed={marcas[s.id] === false} onClick={() => marcar(s.id, false)}>No</button>
+                {/* Tercer estado: sin marcar. Es el de partida y se puede volver a él en cualquier momento */}
+                <button className={'pend' + (marcas[s.id] === undefined ? ' on' : '')} disabled={!puedeEditar}
+                  aria-pressed={marcas[s.id] === undefined} aria-label="Sin marcar" title="Sin marcar"
+                  onClick={() => marcas[s.id] !== undefined && marcar(s.id, marcas[s.id])}>–</button>
               </span>
             </div>
           ))}

@@ -4,11 +4,20 @@ import Admin from './Admin'
 import Ajustes from './Ajustes'
 import Socios from './Socios'
 import Asistencia from './Asistencia'
+import { Logo, IconoApp } from './iconos'
 
 // ECharts pesa bastante: solo se descarga al abrir Estadísticas
 const Estadisticas = lazy(() => import('./Estadisticas'))
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
+
+// Qué ve cada rol en la demo, explicado para quien la prueba
+const ROLES_DEMO = [
+  ['encargado', 'Encargado', 'Gestiona socios, actividades, permisos y ajustes de la asociación.'],
+  ['preceptor', 'Preceptor', 'Ve y edita los socios de 1º y 2º ESO, según los permisos que le da el encargado.'],
+  ['familia', 'Familia', 'Consulta la ficha y la asistencia de sus hijos, sin poder modificarlas.'],
+  ['admin', 'Admin global', 'Crea asociaciones, concede apps y autoriza a los encargados.']
+]
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -56,17 +65,22 @@ export default function App() {
   if (!session)
     return (
       <main className="centro">
-        <h1>Hub de Asociación</h1>
+        <span className="logo"><Logo size={30} /></span>
+        <h1>Hub de asociación</h1>
         {DEMO ? (
           <>
-            <p className="aviso">Modo demo con datos de ejemplo. Elige con qué rol quieres entrar:</p>
+            <p>Esta es una demo con datos de ejemplo. Elige con qué rol quieres entrar.</p>
             <div className="roles-demo">
-              {[['encargado', 'Encargado'], ['preceptor', 'Preceptor (1º y 2º ESO)'], ['familia', 'Familia'], ['admin', 'Admin global']]
-                .map(([k, t]) => <button key={k} className="primario" onClick={() => supabase.auth.entrarComo(k)}>{t}</button>)}
+              {ROLES_DEMO.map(([k, titulo, desc]) => (
+                <button key={k} className="rol-demo" onClick={() => supabase.auth.entrarComo(k)}>
+                  <b>{titulo}</b><span>{desc}</span>
+                </button>
+              ))}
             </div>
           </>
         ) : (
           <>
+            <p>Socios, asistencia y estadísticas de tu asociación juvenil.</p>
             {error && <p className="error">{error}. Pide a tu encargado que autorice tu correo.</p>}
             <button className="primario" onClick={() =>
               supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } })}>
@@ -90,27 +104,48 @@ export default function App() {
 
   return (
     <div className="app">
-      {DEMO && <div className="demo">Modo demo · datos de ejemplo que se reinician al recargar la página</div>}
-      <header>
-        <div>
-          <strong>{mem?.asociaciones?.nombre || 'Administración global'}</strong>
-          <small>{esAdmin ? 'Admin global' : ROL[mem?.rol]} · {session.user.email}</small>
+      {DEMO && <div className="demo">Modo demo con datos de ejemplo. Se reinician al recargar la página.</div>}
+      <header className="cabecera">
+        <div className="cabecera-in">
+          <div className="marca">
+            <span className="logo"><Logo /></span>
+            <div>
+              <strong>{mem?.asociaciones?.nombre || 'Administración global'}</strong>
+              <span className="rol">{esAdmin ? 'Admin global' : ROL[mem?.rol]}</span>
+              <span className="correo">{session.user.email}</span>
+            </div>
+          </div>
+          <nav>
+            <button className={vista === 'hub' || vista === 'app' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
+            {esEncargado && <button className={vista === 'ajustes' ? 'activo' : ''} onClick={() => setVista('ajustes')}>Ajustes</button>}
+            {esAdmin && <button className={vista === 'admin' ? 'activo' : ''} onClick={() => setVista('admin')}>Admin</button>}
+            <button onClick={() => supabase.auth.signOut()}>Salir</button>
+          </nav>
         </div>
-        <nav>
-          <button onClick={() => setVista('hub')}>Inicio</button>
-          {esEncargado && <button onClick={() => setVista('ajustes')}>Ajustes</button>}
-          {esAdmin && <button onClick={() => setVista('admin')}>Admin</button>}
-          <button onClick={() => supabase.auth.signOut()}>Salir</button>
-        </nav>
       </header>
 
       {vista === 'hub' && (
         <main>
-          {activas.length === 0 && <p>No hay apps activas todavía{esEncargado && ': actívalas en Ajustes'}.</p>}
+          <h1 className="solo-lectores">Apps de la asociación</h1>
+          {activas.length === 0 && (
+            <div className="vacio">
+              <p>
+                {esAdmin && !mem
+                  ? 'Eres admin global: crea asociaciones, concede apps y autoriza a sus encargados desde Admin.'
+                  : esEncargado
+                    ? 'Todavía no hay apps activas. Actívalas en Ajustes para empezar.'
+                    : 'Todavía no tienes apps disponibles. Pídele acceso al encargado de tu asociación.'}
+              </p>
+              {esAdmin && !mem && <button className="primario" onClick={() => setVista('admin')}>Abrir Admin</button>}
+              {esEncargado && <button className="primario" onClick={() => setVista('ajustes')}>Abrir Ajustes</button>}
+            </div>
+          )}
           <div className="grid">
             {activas.map(a => (
               <button key={a.app_clave} className="tarjeta" onClick={() => { setAbierta(a); setVista('app') }}>
-                <b>{a.apps.nombre}</b><span>{a.apps.descripcion}</span>
+                <span className="icono"><IconoApp clave={a.app_clave} /></span>
+                <b>{a.apps.nombre}</b>
+                <span className="desc">{a.apps.descripcion}</span>
               </button>
             ))}
           </div>
