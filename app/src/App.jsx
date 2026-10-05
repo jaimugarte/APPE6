@@ -8,6 +8,7 @@ import { Logo, IconoApp } from './iconos'
 import { useFotoUrl } from './foto'
 import FormularioAlta from './FormularioAlta'
 import Solicitudes from './Solicitudes'
+import FamiliaInicio from './FamiliaInicio'
 
 // ECharts pesa bastante: solo se descarga al abrir Estadísticas
 const Estadisticas = lazy(() => import('./Estadisticas'))
@@ -116,14 +117,15 @@ export default function App() {
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
   // Las familias nunca ven Asistencia ni Estadísticas; sí el resto de apps (socios, anuncios, fotos…)
-  const SOLO_EQUIPO = ['asistencia', 'estadisticas']
+  const SOLO_EQUIPO = ['asistencia', 'estadisticas', 'socios'] // Socios lo sustituye, para ellas, su pantalla de inicio
   const visible = a => esEncargado
     || (mem?.rol === 'preceptor'
       ? !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver
       : !SOLO_EQUIPO.includes(a.app_clave))
   const activas = apps.filter(a => a.activa && visible(a))
-  // Solicitudes no es una app del catálogo: la ven quien puede aprobar y las familias
-  const conSolicitudes = !!mem && (aprueba || mem.rol === 'familia')
+  // Solicitudes no es una app del catálogo: solo quien puede aprobar. Las familias ven el estado en su inicio.
+  const esFamilia = mem?.rol === 'familia'
+  const conSolicitudes = !!mem && aprueba
 
   return (
     <div className="app">
@@ -149,7 +151,22 @@ export default function App() {
         </div>
       </header>
 
-      {vista === 'hub' && (
+      {vista === 'hub' && esFamilia && (
+        <FamiliaInicio onCambio={cargar}
+          arriba={fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${mem?.asociaciones?.nombre || 'la asociación'}`} />}
+          abajo={activas.length > 0 && (
+            <div className="grid">
+              {activas.map(a => (
+                <button key={a.app_clave} className="tarjeta" onClick={() => { setAbierta(a); setVista('app') }}>
+                  <span className="icono"><IconoApp clave={a.app_clave} /></span>
+                  <b>{a.apps.nombre}</b>
+                  <span className="desc">{a.apps.descripcion}</span>
+                </button>
+              ))}
+            </div>
+          )} />
+      )}
+      {vista === 'hub' && !esFamilia && (
         <main>
           <h1 className="solo-lectores">Apps de la asociación</h1>
           {fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${mem?.asociaciones?.nombre || 'la asociación'}`} />}
@@ -171,7 +188,7 @@ export default function App() {
               <button className="tarjeta" onClick={() => setVista('solicitudes')}>
                 <span className="icono"><IconoApp clave="solicitudes" /></span>
                 <b>Solicitudes{pendientes > 0 && <span className="contador" aria-label={`${pendientes} pendientes`}>{pendientes}</span>}</b>
-                <span className="desc">{mem.rol === 'familia' ? 'Alta y baja de tus hijos' : 'Altas y bajas pendientes de aprobar'}</span>
+                <span className="desc">Altas pendientes de aprobar</span>
               </button>
             )}
             {activas.map(a => (
@@ -194,7 +211,7 @@ export default function App() {
         </Suspense>}
       {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
-      {vista === 'solicitudes' && conSolicitudes && <Solicitudes rol={mem.rol} onCambio={cargar} />}
+      {vista === 'solicitudes' && conSolicitudes && <Solicitudes onCambio={cargar} />}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}

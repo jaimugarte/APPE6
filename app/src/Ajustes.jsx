@@ -4,6 +4,7 @@ import Permisos from './Permisos'
 import FotoAsociacion from './FotoAsociacion'
 import Invitaciones from './Invitaciones'
 import Aprobadores from './Aprobadores'
+import Cuotas from './Cuotas'
 import { abrev, limpiarAbrev } from './util'
 
 export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
@@ -123,6 +124,8 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
           <button onClick={addAcceso}>Autorizar</button>
         </div>
       </section>
+
+      <Cuotas asoc={asoc} />
 
       <Invitaciones asoc={asoc} uid={uid} />
       <Aprobadores asoc={asoc} />

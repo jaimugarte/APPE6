@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { NIVELES, hoy, fecha, edad, normalizarIban, ibanValido, esEmail } from './util'
+import { eur, textoDescuento } from './cuotas'
 
 const VACIO = {
   nombre: '', apellidos: '', fecha_nacimiento: '', nivel: '',
@@ -126,6 +127,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [versionCuota, setVersionCuota] = useState(0)
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const ro = !puedeEditar
 
@@ -238,7 +240,8 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
       )}
 
       {!nuevo && <Periodos socio={socio} puedeEditar={puedeEditar} onCambio={onCambio} />}
-      {!nuevo && (esEncargado || puedeEditar) && <Familia socio={socio} esEncargado={esEncargado} />}
+      {!nuevo && (esEncargado || puedeEditar) && <Familia socio={socio} esEncargado={esEncargado} onVinculo={() => setVersionCuota(v => v + 1)} />}
+      {!nuevo && <CuotaFamilia key={versionCuota} socio={socio} />}
     </main>
   )
 }
@@ -300,7 +303,7 @@ function Periodos({ socio, puedeEditar, onCambio }) {
 }
 
 // Cuentas de Google de las familias que pueden ver a este socio
-function Familia({ socio, esEncargado }) {
+function Familia({ socio, esEncargado, onVinculo }) {
   const [lista, setLista] = useState([])
   const [email, setEmail] = useState('')
   const [msg, setMsg] = useState('')
@@ -328,7 +331,8 @@ function Familia({ socio, esEncargado }) {
     }
     const { error } = await supabase.from('familiares_socios').insert({ email: e, socio_id: socio.id })
     if (error) return setMsg(error.code === '23505' ? 'Ese correo ya está vinculado.' : error.message)
-    setEmail(''); cargar()
+    await supabase.rpc('asegurar_familia', { p_socio: socio.id }) // registra la familia para su cuota y descuento
+    setEmail(''); cargar(); onVinculo?.()
   }
   const quitar = async e => {
     const { error } = await supabase.from('familiares_socios').delete().eq('socio_id', socio.id).eq('email', e)
@@ -356,6 +360,65 @@ function Familia({ socio, esEncargado }) {
         <button onClick={vincular}>{esEncargado ? 'Autorizar y vincular' : 'Vincular'}</button>
       </div>
       {msg && <p className="error">{msg}</p>}
+    </section>
+  )
+}
+
+// Cuota mensual de la familia de este socio y descuento (lo pone el encargado o, si se permite, el preceptor)
+function CuotaFamilia({ socio }) {
+  const [c, setC] = useState(undefined) // undefined = cargando, null = sin familia registrada
+  const [tipo, setTipo] = useState('porcentaje')
+  const [valor, setValor] = useState('')
+  const [nota, setNota] = useState('')
+  const [msg, setMsg] = useState('')
+  const [ok, setOk] = useState('')
+
+  const cargar = async () => {
+    const { data, error } = await supabase.rpc('cuota_familia', { p_socio: socio.id })
+    if (error) { setMsg(error.message); return setC(null) }
+    setC(data || null)
+    if (data) { setTipo(data.descuento_tipo); setValor(String(data.descuento_valor || '')); setNota(data.descuento_nota || '') }
+  }
+  useEffect(() => { cargar() }, [socio.id])
+
+  const guardar = async () => {
+    setMsg(''); setOk('')
+    const n = Number((valor || '0').replace(',', '.'))
+    if (!Number.isFinite(n) || n < 0 || (tipo === 'porcentaje' && n > 100)) return setMsg('Descuento no válido.')
+    const { error } = await supabase.rpc('poner_descuento', { p_socio: socio.id, p_tipo: tipo, p_valor: n, p_nota: nota })
+    if (error) return setMsg(error.message)
+    setOk('Descuento guardado.'); cargar()
+  }
+
+  if (c === undefined) return null
+  return (
+    <section>
+      <h2>Cuota de la familia</h2>
+      {!c && <p className="aviso">{msg || 'Este socio no tiene una cuenta de familia vinculada: vincúlala arriba para calcular su cuota.'}</p>}
+      {c && (
+        <>
+          <p>
+            <b>{eur(c.total)}/mes</b> por {c.hijos} {c.hijos === 1 ? 'hijo' : 'hijos'} de alta
+            {c.descuento > 0 && <small className="aviso"> · cuota sin descuento {eur(c.base)}, descuento {textoDescuento(c.descuento_tipo, c.descuento_valor)} (−{eur(c.descuento)})</small>}
+          </p>
+          {c.puede_descuento ? (
+            <>
+              <div className="fila">
+                <input className="importe" inputMode="decimal" aria-label="Valor del descuento" value={valor} placeholder="0" onChange={e => setValor(e.target.value)} />
+                <select aria-label="Tipo de descuento" value={tipo} onChange={e => setTipo(e.target.value)}>
+                  <option value="porcentaje">%</option><option value="euros">€/mes</option>
+                </select>
+                <input placeholder="Motivo (opcional)" value={nota} onChange={e => setNota(e.target.value)} />
+                <button onClick={guardar}>Guardar descuento</button>
+              </div>
+              {msg && <p className="error">{msg}</p>}
+              {ok && <p className="okmsg">{ok}</p>}
+            </>
+          ) : (
+            c.descuento_valor > 0 && c.descuento_nota && <p className="aviso">Motivo del descuento: {c.descuento_nota}</p>
+          )}
+        </>
+      )}
     </section>
   )
 }

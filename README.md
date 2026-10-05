@@ -57,3 +57,9 @@ Aviso: si faltan las claves de Supabase, la app arranca en modo demo y lo indica
 ## Solicitudes de alta
 
 El encargado crea un **enlace de invitación** en Ajustes y lo reparte a las familias. El enlace lleva a un formulario público (no hace falta cuenta) donde la familia solicita el alta; la solicitud la aprueba el encargado o un preceptor autorizado (Ajustes → «Quién aprueba las solicitudes»: no / solo su nivel / todas). Al aprobarla, la cuenta de Google de la familia queda autorizada; entonces entra, solicita el alta de cada hijo (que se aprueba igual) y puede darlo de baja él mismo, tras una confirmación con cuenta atrás de 10 segundos. Cada progenitor o tutor entra con su propia cuenta de Google. En la demo, el formulario está en `/?alta=demo-invitacion`.
+
+## Experiencia de la familia y cuotas
+
+Las familias no ven Socios ni Solicitudes: su inicio muestra el resumen (hijos de alta y cuota mensual, con el descuento si lo tienen), la lista de hijos con su estado (Activo / Baja / Alta solicitada), «Dar de alta otro hijo/a» y «Datos de la familia». Dentro de cada hijo editan sus datos y pueden darlo de baja. El nivel no se elige: sale de la fecha de nacimiento (curso que empieza el 1 de septiembre) y lo gestiona la asociación.
+
+Cuota: en Ajustes el encargado define el importe mensual por orden de hermano (por defecto 35 € el hijo de alta más antiguo, 10 € el segundo y 0 € el resto; el último tramo vale para los siguientes). Los descuentos son por familia (en % o en €/mes) y los pone el encargado, o los preceptores si el encargado lo permite, desde la ficha del socio. Las familias no pueden pedirlos desde la app.

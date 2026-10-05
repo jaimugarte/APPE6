@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { NIVELES, fecha } from './util'
+import { fecha } from './util'
 
 const TIPO = { familia: 'Alta de familia', socio: 'Alta de hijo/a' }
 const ESTADO = { pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada' }
@@ -16,7 +16,6 @@ function Detalle({ s }) {
         <Dato k="Madre o tutora" v={[d.nombre_madre, d.correo_madre].filter(Boolean).join(' · ')} />
         <Dato k="Móvil" v={[d.movil_padre, d.movil_madre].filter(Boolean).join(' · ')} />
         <Dato k="Dirección" v={d.direccion} />
-        <Dato k="Niveles de sus hijos" v={s.niveles?.join(', ')} />
       </>
     )
   if (s.tipo === 'socio')
@@ -31,14 +30,13 @@ function Detalle({ s }) {
 }
 
 // Pantalla de solicitudes. Quien puede aprobar (encargado o preceptor autorizado) las resuelve;
-// la familia ve las suyas, pide el alta de sus hijos y puede darlos de baja (con confirmación).
-export default function Solicitudes({ rol, onCambio }) {
+// Las familias no usan esta pantalla: ven el estado de sus hijos en su inicio.
+export default function Solicitudes({ onCambio }) {
   const [lista, setLista] = useState(null)
   const [msg, setMsg] = useState('')
   const [rechazando, setRechazando] = useState(null)
   const [motivo, setMotivo] = useState('')
   const [verResueltas, setVerResueltas] = useState(false)
-  const esFamilia = rol === 'familia'
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase.from('solicitudes_alta').select('*').order('creada_en', { ascending: false })
@@ -60,17 +58,15 @@ export default function Solicitudes({ rol, onCambio }) {
 
   return (
     <main className="solicitudes">
-      <div className="barra"><h2>{esFamilia ? 'Mis solicitudes' : 'Solicitudes'}</h2></div>
+      <div className="barra"><h2>Solicitudes</h2></div>
       {msg && <p className="error">{msg}</p>}
 
-      {esFamilia && <SolicitudesFamilia recargar={() => { cargar(); onCambio?.() }} setMsg={setMsg} />}
-
-      {!esFamilia && pendientes.length === 0 && <p className="aviso">No hay solicitudes pendientes.</p>}
+      {pendientes.length === 0 && <p className="aviso">No hay solicitudes pendientes.</p>}
       {pendientes.map(s => (
         <article key={s.id} className="solicitud">
           <header><span className={'badge tipo-' + s.tipo}>{TIPO[s.tipo]}</span><small>{fecha(s.creada_en?.slice(0, 10))}</small></header>
           <div className="datos"><Detalle s={s} /></div>
-          {!esFamilia && (rechazando === s.id ? (
+          {(rechazando === s.id ? (
             <div className="fila">
               <input placeholder="Motivo (opcional)" value={motivo} onChange={e => setMotivo(e.target.value)} />
               <button className="peligro" onClick={() => resolver(s, false)}>Rechazar</button>
@@ -82,7 +78,6 @@ export default function Solicitudes({ rol, onCambio }) {
               <button onClick={() => setRechazando(s.id)}>Rechazar</button>
             </div>
           ))}
-          {esFamilia && <p className="aviso">Pendiente de aprobación.</p>}
         </article>
       ))}
 
@@ -104,96 +99,5 @@ export default function Solicitudes({ rol, onCambio }) {
         </>
       )}
     </main>
-  )
-}
-
-// Alta y baja de hijos, solo para la familia
-function SolicitudesFamilia({ recargar, setMsg }) {
-  const [hijos, setHijos] = useState([])
-  const [nuevo, setNuevo] = useState(false)
-  const [f, setF] = useState({ nombre: '', apellidos: '', fecha_nacimiento: '', nivel: '', alergias: '', correo_socio: '' })
-  const [bajaDe, setBajaDe] = useState(null)
-
-  const cargar = useCallback(async () => {
-    const { data } = await supabase.from('socios').select('id, nombre, apellidos, nivel, periodos_alta(fecha_alta, fecha_baja)').order('nombre')
-    setHijos(data || [])
-  }, [])
-  useEffect(() => { cargar() }, [cargar])
-  const set = k => e => setF({ ...f, [k]: e.target.value })
-
-  const pedirAlta = async e => {
-    e.preventDefault()
-    if (!f.nombre.trim() || !f.apellidos.trim() || !f.nivel) return setMsg('Indica nombre, apellidos y nivel.')
-    const { error } = await supabase.rpc('solicitar_socio', { p_datos: f })
-    setMsg(error?.message || '')
-    if (!error) { setNuevo(false); setF({ nombre: '', apellidos: '', fecha_nacimiento: '', nivel: '', alergias: '', correo_socio: '' }); recargar() }
-  }
-  const darDeBaja = async (id, motivo) => {
-    const { error } = await supabase.rpc('dar_de_baja_familia', { p_socio: id, p_motivo: motivo })
-    setMsg(error?.message || '')
-    if (!error) { setBajaDe(null); cargar(); recargar() }
-  }
-
-  const activos = hijos.filter(h => (h.periodos_alta || []).some(p => !p.fecha_baja))
-
-  return (
-    <section>
-      <h2>Mis hijos</h2>
-      {activos.length === 0 && <p className="aviso">Todavía no hay ningún hijo dado de alta.</p>}
-      {activos.map(h => (
-        <div key={h.id} className="actividad hijo">
-          <span><b>{h.nombre} {h.apellidos}</b> <small>{h.nivel}</small></span>
-          {bajaDe !== h.id && <button className="mini" onClick={() => setBajaDe(h.id)}>Dar de baja</button>}
-          {bajaDe === h.id && <ConfirmarBaja nombre={h.nombre} onConfirmar={m => darDeBaja(h.id, m)} onCancelar={() => setBajaDe(null)} />}
-        </div>
-      ))}
-      {!nuevo
-        ? <div className="fila"><button className="primario" onClick={() => setNuevo(true)}>Solicitar alta de un hijo/a</button></div>
-        : (
-          <form className="nuevo-hijo" onSubmit={pedirAlta}>
-            <div className="dos-col">
-              <label className="campo">Nombre *<input value={f.nombre} onChange={set('nombre')} /></label>
-              <label className="campo">Apellidos *<input value={f.apellidos} onChange={set('apellidos')} /></label>
-              <label className="campo">Fecha de nacimiento<input type="date" value={f.fecha_nacimiento} onChange={set('fecha_nacimiento')} /></label>
-              <label className="campo">Nivel *
-                <select value={f.nivel} onChange={set('nivel')}>
-                  <option value="">Elige…</option>
-                  {NIVELES.map(n => <option key={n}>{n}</option>)}
-                </select>
-              </label>
-              <label className="campo">Alergias<input value={f.alergias} onChange={set('alergias')} /></label>
-              <label className="campo">Correo del socio (opcional)<input type="email" value={f.correo_socio} onChange={set('correo_socio')} /></label>
-            </div>
-            <div className="fila">
-              <button className="primario">Enviar solicitud</button>
-              <button type="button" onClick={() => setNuevo(false)}>Cancelar</button>
-            </div>
-          </form>
-        )}
-    </section>
-  )
-}
-
-// Confirmación de baja con cuenta atrás: el botón de confirmar se activa a los 10 segundos
-const ESPERA = 10
-function ConfirmarBaja({ nombre, onConfirmar, onCancelar }) {
-  const [resto, setResto] = useState(ESPERA)
-  const [motivo, setMotivo] = useState('')
-  useEffect(() => {
-    if (resto <= 0) return
-    const t = setTimeout(() => setResto(r => r - 1), 1000)
-    return () => clearTimeout(t)
-  }, [resto])
-  return (
-    <div className="confirmar-baja" role="alertdialog" aria-label={`Confirmar la baja de ${nombre}`}>
-      <p><b>¿Seguro que quieres dar de baja a {nombre}?</b> La baja es inmediata y quedará en su historial.</p>
-      <input placeholder="Motivo (opcional)" value={motivo} onChange={e => setMotivo(e.target.value)} />
-      <div className="fila">
-        <button className="peligro" disabled={resto > 0} onClick={() => onConfirmar(motivo)}>
-          {resto > 0 ? `Confirmar baja (${resto})` : 'Confirmar baja'}
-        </button>
-        <button onClick={onCancelar}>Cancelar</button>
-      </div>
-    </div>
   )
 }

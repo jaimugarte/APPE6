@@ -112,3 +112,15 @@ export function etiquetaPeriodoCorta(inicio, per, hoyIso) {
   }
   return String(d.getFullYear())
 }
+
+// Nivel que corresponde por fecha de nacimiento (curso que empieza el 1 de septiembre): 1º de primaria son los
+// que cumplen 6 años ese año natural. Igual que nivel_por_nacimiento() de la base de datos. Fuera de rango: null.
+export function nivelPorNacimiento(nacIso, hoyIso = hoy()) {
+  if (!nacIso) return null
+  const [y, m] = hoyIso.split('-').map(Number)
+  const n = (m >= 9 ? y : y - 1) - Number(nacIso.slice(0, 4)) - 5
+  if (n >= 1 && n <= 6) return `${n}º primaria`
+  if (n >= 7 && n <= 10) return `${n - 6}º ESO`
+  if (n >= 11 && n <= 12) return `${n - 10}º Bachillerato`
+  return null
+}

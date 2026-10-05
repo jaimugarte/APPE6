@@ -427,9 +427,23 @@ create table familias (
   correo_padre text, correo_madre text,
   movil_padre text, movil_madre text,
   direccion text,
+  -- Descuento concedido a la familia (excepciones). Lo ponen el encargado o, si éste lo permite, los preceptores.
+  descuento_tipo text not null default 'porcentaje' check (descuento_tipo in ('porcentaje', 'euros')),
+  descuento_valor numeric(8,2) not null default 0 check (descuento_valor >= 0 and (descuento_tipo <> 'porcentaje' or descuento_valor <= 100)),
+  descuento_nota text,
   creada_en timestamptz not null default now()
 );
 create index on familias using gin (emails);
+
+-- Criterio de cuotas de la asociación: importe mensual según el orden del hijo en la familia
+-- (importes[1] = hijo de alta más antiguo, importes[2] = segundo…; el último vale para todos los siguientes).
+-- Sin fila = criterio por defecto: 35 €, 10 € y 0 € para el resto.
+create table config_cuotas (
+  asociacion_id uuid primary key references asociaciones on delete cascade,
+  importes numeric(8,2)[] not null default '{35,10,0}'
+    check (cardinality(importes) between 1 and 10 and 0 <= all(importes)),
+  preceptores_descuento boolean not null default false
+);
 
 -- Qué preceptores pueden aprobar solicitudes: ninguna, solo las de sus niveles, o todas.
 -- Sin fila = ninguna. El encargado siempre puede aprobarlas todas.
@@ -485,7 +499,7 @@ language sql stable security definer set search_path = public as $$
 -- Cada progenitor (padre o tutor, madre o tutora) aporta su nombre y su cuenta de Google; basta con uno.
 create function solicitar_alta_familia(p_token text, p_datos jsonb) returns void
 language plpgsql security definer set search_path = public as $$
-declare v_asoc uuid; v_cp text; v_cm text; v_np text; v_nm text; v_emails text[]; v_niv text[];
+declare v_asoc uuid; v_cp text; v_cm text; v_np text; v_nm text; v_emails text[];
   v_re constant text := '^[^@\s]+@[^@\s]+\.[^@\s]+$';
   t jsonb := coalesce(p_datos, '{}');
 begin
@@ -517,10 +531,9 @@ begin
   if (select count(*) from solicitudes_alta where asociacion_id = v_asoc and estado = 'pendiente') >= 300 then
     raise exception 'Hay demasiadas solicitudes pendientes. Inténtalo más tarde';
   end if;
-  select coalesce(array_agg(left(x, 40)), '{}') into v_niv
-    from (select jsonb_array_elements_text(coalesce(t->'niveles', '[]'::jsonb)) x limit 8) q;
+  -- Las familias no tienen nivel: las altas de familia las aprueban el encargado y quien pueda aprobar «todas»
   insert into solicitudes_alta(asociacion_id, tipo, email, niveles, datos)
-  values (v_asoc, 'familia', v_emails[1], v_niv, jsonb_build_object(
+  values (v_asoc, 'familia', v_emails[1], '{}', jsonb_build_object(
     'nombre_padre', v_np, 'nombre_madre', v_nm, 'correo_padre', v_cp, 'correo_madre', v_cm,
     'movil_padre', left(trim(coalesce(t->>'movil_padre', '')), 30),
     'movil_madre', left(trim(coalesce(t->>'movil_madre', '')), 30),
@@ -531,20 +544,30 @@ end $$;
 
 grant execute on function info_enlace(text), solicitar_alta_familia(text, jsonb) to anon, authenticated;
 
--- Una familia ya aprobada solicita el alta de un hijo
+-- Nivel que le corresponde a un niño por su fecha de nacimiento (curso que empieza el 1 de septiembre):
+-- 1º de primaria = los que cumplen 6 años ese año natural. Fuera de primaria–bachillerato devuelve null.
+create function nivel_por_nacimiento(p_nac date, p_hoy date default current_date) returns text
+language sql stable as $$
+  select case when n between 1 and 6 then n || 'º primaria'
+              when n between 7 and 10 then (n - 6) || 'º ESO'
+              when n between 11 and 12 then (n - 10) || 'º Bachillerato' end
+  from (select ((case when extract(month from p_hoy) >= 9 then extract(year from p_hoy) else extract(year from p_hoy) - 1 end)
+                - extract(year from p_nac) - 5)::int as n) q $$;
+
+-- Una familia ya aprobada solicita el alta de un hijo. El nivel sale de la fecha de nacimiento: la familia no lo elige.
 create function solicitar_socio(p_datos jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare v_asoc uuid; v_nivel text; v_nac date; t jsonb := coalesce(p_datos, '{}');
 begin
   select m.asociacion_id into v_asoc from membresias m where m.user_id = auth.uid() and m.rol = 'familia';
   if v_asoc is null then raise exception 'Solo las familias pueden solicitar el alta de un hijo'; end if;
-  v_nivel := left(trim(coalesce(t->>'nivel', '')), 40);
-  if trim(coalesce(t->>'nombre', '')) = '' or trim(coalesce(t->>'apellidos', '')) = '' or v_nivel = '' then
-    raise exception 'Faltan datos obligatorios';
+  if trim(coalesce(t->>'nombre', '')) = '' or trim(coalesce(t->>'apellidos', '')) = '' or coalesce(t->>'fecha_nacimiento', '') = '' then
+    raise exception 'Indica nombre, apellidos y fecha de nacimiento';
   end if;
-  v_nac := nullif(t->>'fecha_nacimiento', '')::date;
+  v_nac := (t->>'fecha_nacimiento')::date;
+  v_nivel := nivel_por_nacimiento(v_nac);
   insert into solicitudes_alta(asociacion_id, tipo, email, niveles, datos)
-  values (v_asoc, 'socio', email_actual(), array[v_nivel], jsonb_build_object(
+  values (v_asoc, 'socio', email_actual(), case when v_nivel is null then '{}' else array[v_nivel] end, jsonb_build_object(
     'nombre', left(trim(t->>'nombre'), 80), 'apellidos', left(trim(t->>'apellidos'), 120),
     'fecha_nacimiento', to_char(v_nac, 'YYYY-MM-DD'), 'nivel', v_nivel,
     'alergias', left(trim(coalesce(t->>'alergias', '')), 200),
@@ -560,6 +583,140 @@ begin
     set fecha_baja = greatest(current_date, fecha_alta), motivo_baja = nullif(left(trim(coalesce(p_motivo, '')), 300), '')
     where socio_id = p_socio and fecha_baja is null;
   if not found then raise exception 'Este socio ya está de baja'; end if;
+end $$;
+
+-- Familia: editar los datos de la familia (nombres, móviles, dirección) y, de paso, las copias que lleva cada hijo.
+-- Los correos no se cambian aquí: son las cuentas de Google autorizadas y las gestiona el encargado.
+create function actualizar_familia(p_datos jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare f familias; t jsonb := coalesce(p_datos, '{}');
+begin
+  select * into f from familias where email_actual() = any(emails) limit 1;
+  if f.id is null then raise exception 'No tienes una familia registrada'; end if;
+  update familias set
+    nombre_padre = nullif(left(trim(coalesce(t->>'nombre_padre', '')), 120), ''),
+    nombre_madre = nullif(left(trim(coalesce(t->>'nombre_madre', '')), 120), ''),
+    movil_padre = nullif(left(trim(coalesce(t->>'movil_padre', '')), 30), ''),
+    movil_madre = nullif(left(trim(coalesce(t->>'movil_madre', '')), 30), ''),
+    direccion = nullif(left(trim(coalesce(t->>'direccion', '')), 200), '')
+  where id = f.id
+  returning * into f;
+  update socios set nombre_padre = f.nombre_padre, nombre_madre = f.nombre_madre,
+                    movil_padre = f.movil_padre, movil_madre = f.movil_madre, direccion = f.direccion
+    where asociacion_id = f.asociacion_id
+      and id in (select socio_id from familiares_socios where email = any(f.emails));
+end $$;
+
+-- Familia: editar los datos propios de un hijo (el nivel y las altas/bajas no se tocan desde aquí)
+create function actualizar_hijo(p_socio uuid, p_datos jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare t jsonb := coalesce(p_datos, '{}');
+begin
+  if not coalesce(es_familiar_de(p_socio), false) then raise exception 'No puedes editar a este socio'; end if;
+  if trim(coalesce(t->>'nombre', '')) = '' or trim(coalesce(t->>'apellidos', '')) = '' then
+    raise exception 'Nombre y apellidos son obligatorios';
+  end if;
+  update socios set
+    nombre = left(trim(t->>'nombre'), 80), apellidos = left(trim(t->>'apellidos'), 120),
+    fecha_nacimiento = nullif(t->>'fecha_nacimiento', '')::date,
+    alergias = nullif(left(trim(coalesce(t->>'alergias', '')), 200), ''),
+    correo_socio = nullif(left(trim(coalesce(t->>'correo_socio', '')), 120), '')
+    where id = p_socio;
+end $$;
+
+-- Familia (registro) a la que pertenece un socio, según las cuentas vinculadas a él
+create function familia_de_socio(p_socio uuid) returns familias
+language sql stable security definer set search_path = public as $$
+  select f.* from familias f join socios s on s.id = p_socio and s.asociacion_id = f.asociacion_id
+  where f.emails && (select coalesce(array_agg(email), '{}') from familiares_socios where socio_id = p_socio)
+  limit 1 $$;
+
+-- Cuota mensual de una familia según el criterio de la asociación. Sin parámetro: la familia de quien llama.
+-- Con un socio: su familia (la ve su familia, el encargado y los preceptores que pueden ver a ese socio).
+-- Cada hijo de alta paga según su orden de antigüedad en el alta; al total se le resta el descuento de la familia.
+create function cuota_familia(p_socio uuid default null) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare f familias; v_imp numeric[]; v_base numeric := 0; v_det jsonb := '[]'; r record; i int := 0; v_n numeric;
+  v_desc numeric := 0; v_puede boolean := false;
+begin
+  if p_socio is null then
+    select * into f from familias where email_actual() = any(emails) limit 1;
+  else
+    if not (coalesce(puede_socio(p_socio, 'socios', 'ver'), false) or coalesce(es_familiar_de(p_socio), false)) then
+      raise exception 'Sin permiso';
+    end if;
+    f := familia_de_socio(p_socio);
+  end if;
+  if f.id is null then return null; end if;
+  select importes into v_imp from config_cuotas where asociacion_id = f.asociacion_id;
+  v_imp := coalesce(v_imp, '{35,10,0}');
+  for r in
+    select s.id, (select min(fecha_alta) from periodos_alta where socio_id = s.id) as desde
+    from socios s join familiares_socios fs on fs.socio_id = s.id
+    where fs.email = any(f.emails) and s.asociacion_id = f.asociacion_id
+      and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+    group by s.id order by 2, s.creado_en, s.id
+  loop
+    i := i + 1;
+    v_n := v_imp[least(i, cardinality(v_imp))];
+    v_det := v_det || jsonb_build_object('socio_id', r.id, 'orden', i, 'importe', v_n);
+    v_base := v_base + v_n;
+  end loop;
+  if f.descuento_tipo = 'porcentaje' then v_desc := round(v_base * f.descuento_valor / 100, 2);
+  else v_desc := least(f.descuento_valor, v_base); end if;
+  if p_socio is not null then
+    v_puede := case rol_en(f.asociacion_id)
+      when 'encargado' then true
+      when 'preceptor' then coalesce((select preceptores_descuento from config_cuotas where asociacion_id = f.asociacion_id), false)
+                            and coalesce(puede_socio(p_socio, 'socios', 'editar'), false)
+      else false end;
+  end if;
+  return jsonb_build_object('familia_id', f.id, 'hijos', i, 'base', v_base, 'descuento_tipo', f.descuento_tipo,
+    'descuento_valor', f.descuento_valor, 'descuento_nota', f.descuento_nota, 'descuento', v_desc,
+    'total', greatest(v_base - v_desc, 0), 'detalle', v_det, 'puede_descuento', v_puede);
+end $$;
+
+-- Descuento de cuota: lo pone el encargado o, si éste lo permite, un preceptor que pueda editar a ese socio.
+-- Las familias no pueden pedirlo ni cambiarlo desde la aplicación.
+create function poner_descuento(p_socio uuid, p_tipo text, p_valor numeric, p_nota text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare f familias; v_asoc uuid; v_ok boolean;
+begin
+  select asociacion_id into v_asoc from socios where id = p_socio;
+  v_ok := case rol_en(v_asoc)
+    when 'encargado' then true
+    when 'preceptor' then coalesce((select preceptores_descuento from config_cuotas where asociacion_id = v_asoc), false)
+                          and coalesce(puede_socio(p_socio, 'socios', 'editar'), false)
+    else false end;
+  if not coalesce(v_ok, false) then raise exception 'No tienes permiso para aplicar descuentos'; end if;
+  if p_tipo not in ('porcentaje', 'euros') or p_valor is null or p_valor < 0 or (p_tipo = 'porcentaje' and p_valor > 100) then
+    raise exception 'Descuento no válido';
+  end if;
+  f := familia_de_socio(p_socio);
+  if f.id is null then raise exception 'Este socio no tiene una cuenta de familia vinculada'; end if;
+  update familias set descuento_tipo = p_tipo, descuento_valor = p_valor,
+    descuento_nota = nullif(left(trim(coalesce(p_nota, '')), 200), '') where id = f.id;
+end $$;
+
+-- Personal: al vincular cuentas de familia a un socio creado a mano, se registra (o amplía) su familia,
+-- para que tenga cuota y descuento como las familias que entraron por el formulario.
+create function asegurar_familia(p_socio uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare s socios; f familias; v_emails text[];
+begin
+  if not coalesce(puede_socio(p_socio, 'socios', 'editar'), false) then raise exception 'Sin permiso'; end if;
+  select * into s from socios where id = p_socio;
+  select coalesce(array_agg(email), '{}') into v_emails from familiares_socios where socio_id = p_socio;
+  if cardinality(v_emails) = 0 then return; end if;
+  select * into f from familias where asociacion_id = s.asociacion_id and emails && v_emails limit 1;
+  if f.id is null then
+    insert into familias(asociacion_id, emails, nombre_padre, nombre_madre, correo_padre, correo_madre,
+                         movil_padre, movil_madre, direccion)
+    values (s.asociacion_id, v_emails, s.nombre_padre, s.nombre_madre, s.correo_padre, s.correo_madre,
+            s.movil_padre, s.movil_madre, s.direccion);
+  else
+    update familias set emails = (select array_agg(distinct e) from unnest(f.emails || v_emails) e) where id = f.id;
+  end if;
 end $$;
 
 -- Aprobar o rechazar. Al aprobar se ejecuta el alta con permisos de sistema, de modo que un
@@ -612,6 +769,7 @@ alter table enlaces_alta        enable row level security;
 alter table familias            enable row level security;
 alter table permisos_aprobacion enable row level security;
 alter table solicitudes_alta    enable row level security;
+alter table config_cuotas       enable row level security;
 
 -- Solo el encargado gestiona enlaces y permisos de aprobación (cada preceptor ve el suyo).
 -- Las solicitudes solo se crean y resuelven con las funciones de arriba: no hay políticas de escritura.
@@ -625,3 +783,6 @@ create policy pap_enc on permisos_aprobacion for all
   using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
 create policy sa_ver on solicitudes_alta for select
   using (puede_aprobar(asociacion_id, niveles) or email = email_actual());
+create policy cc_enc on config_cuotas for all
+  using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
+

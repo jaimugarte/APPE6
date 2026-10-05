@@ -293,3 +293,14 @@ input.abrev { width: 84px; min-height: 40px; text-align: center; text-transform:
 .actividad.hijo { flex-wrap: wrap; padding: 6px 0; }
 .confirmar-baja { flex: 1 1 100%; display: grid; gap: 8px; padding: 10px 12px; margin: 4px 0; background: #fdf3f1; border: 1px solid #f0c9c4; border-radius: var(--r-md); }
 .confirmar-baja p { margin: 0; }
+
+/* Inicio de la familia y cuotas */
+.badge.pend { background: #fff1d6; color: #8a5a00; }
+.item.sin-accion { cursor: default; }
+.kpis.dos { grid-template-columns: repeat(2, 1fr); margin-bottom: 8px; }
+.kpi b small { font-family: var(--sans); font-size: .875rem; font-weight: 400; color: var(--tinta-3); margin-left: 2px; }
+section.resumen-cuota { padding: 12px 14px 10px; }
+.descuento { margin: 0; color: var(--tinta-2); font-size: .9rem; }
+.descuento small { color: var(--tinta-3); }
+input.importe { width: 84px; min-height: 40px; text-align: right; }
+.familia-inicio .grid { margin-top: 16px; }

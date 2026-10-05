@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { NIVELES, esEmail } from './util'
+import { esEmail } from './util'
 import { Logo } from './iconos'
 
 const VACIO = {
   nombre_padre: '', correo_padre: '', movil_padre: '', nombre_madre: '', correo_madre: '', movil_madre: '',
-  direccion: '', niveles: [], consentimiento: false, web: ''
+  direccion: '', consentimiento: false, web: ''
 }
 
 // Formulario público (sin iniciar sesión) al que lleva el enlace de invitación: solicitud de alta de una familia.
@@ -21,7 +21,6 @@ export default function FormularioAlta({ token }) {
   }, [token])
 
   const set = k => e => setF({ ...f, [k]: e.target.value })
-  const alternar = n => setF({ ...f, niveles: f.niveles.includes(n) ? f.niveles.filter(x => x !== n) : [...f.niveles, n] })
 
   const enviar = async e => {
     e.preventDefault()
@@ -73,7 +72,7 @@ export default function FormularioAlta({ token }) {
   return (
     <main className="formulario-alta">
       <div className="fa-cab">{cabecera}</div>
-      <p className="sub">Solicitud de alta de familia. Primero das de alta a tu familia y, cuando la aprueben, podrás añadir a cada hijo desde la aplicación.</p>
+      <p className="sub">Solicitud de alta de familia. Primero das de alta a tu familia y, cuando la aprueben, podrás dar de alta a cada hijo desde la aplicación.</p>
       <form onSubmit={enviar} noValidate>
         <section>
           <h2>Padre o tutor</h2>
@@ -97,17 +96,6 @@ export default function FormularioAlta({ token }) {
         <section>
           <h2>Domicilio</h2>
           <label className="campo">Dirección<input value={f.direccion} onChange={set('direccion')} autoComplete="street-address" /></label>
-        </section>
-
-        <section>
-          <h2>Nivel de tus hijos</h2>
-          <p className="sub">Orientativo: ayuda a que la solicitud llegue al preceptor que corresponde. Los datos de cada hijo los añadirás después.</p>
-          <div className="chips">
-            {NIVELES.map(n => (
-              <button type="button" key={n} className={'chip tipo' + (f.niveles.includes(n) ? ' on' : '')}
-                aria-pressed={f.niveles.includes(n)} onClick={() => alternar(n)}>{n}</button>
-            ))}
-          </div>
         </section>
 
         {/* Campo trampa: las personas no lo ven; los robots suelen rellenarlo */}
