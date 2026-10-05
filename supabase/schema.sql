@@ -38,7 +38,8 @@ insert into apps(clave, nombre, descripcion) values
   ('socios',       'Socios',       'Base de datos de socios, altas y bajas'),
   ('asistencia',   'Asistencia',   'Registro de asistencia a actividades'),
   ('estadisticas', 'Estadísticas', 'Gráficos y paneles'),
-  ('anuncios',     'Anuncios',     'Planes y avisos (futuro)'),
+  ('actividades',  'Actividades',  'Planes y actividades de la asociación'),
+  ('anuncios',     'Anuncios',     'Avisos y comunicados (futuro)'),
   ('fotos',        'Fotos',        'Galería de actividades (futuro)');
 
 -- permitida: la concede el admin global · activa: la elige el encargado
@@ -808,4 +809,65 @@ language sql stable security definer set search_path = public as $$
 create policy pc_ver on pagos_cuota for select using (familia_visible(familia_id));
 create policy pc_enc on pagos_cuota for all
   using (familia_gestionable(familia_id)) with check (familia_gestionable(familia_id));
+
+-- ---------- ACTIVIDADES (planes) ----------
+-- Un plan es algo que se hace en una fecha (o varias): charla, salida, retiro… con descripción y precio.
+-- niveles vacío = para todos los niveles. Los preceptores crean planes para sus niveles (o para todos, si su
+-- ámbito es «todos»); el encargado, para cualquiera. Las familias ven los planes de los niveles de sus hijos de alta.
+create table planes (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  titulo text not null check (length(trim(titulo)) between 1 and 120),
+  descripcion text check (length(descripcion) <= 2000),
+  lugar text check (length(lugar) <= 200),
+  fecha date not null,
+  fecha_fin date not null,
+  hora_inicio time,
+  hora_fin time,
+  precio numeric(8,2) not null default 0 check (precio >= 0),
+  niveles text[] not null default '{}',
+  creado_por uuid references perfiles default auth.uid(),
+  creado_en timestamptz not null default now(),
+  check (fecha_fin >= fecha)
+);
+create index on planes(asociacion_id, fecha);
+
+-- ¿Algún hijo de alta del usuario actual (familia) está en alguno de estos niveles?
+create function familia_ve_nivel(p_asoc uuid, p_niveles text[]) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from socios s join familiares_socios fs on fs.socio_id = s.id
+    where fs.email = email_actual() and s.asociacion_id = p_asoc and s.nivel = any(p_niveles)
+      and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)) $$;
+
+create function puede_plan(p_asoc uuid, p_niveles text[], p_accion text) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare v_rol rol_usuario; v_perm permisos_preceptor; v_mios text[];
+begin
+  if not exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = 'actividades' and activa) then
+    return false;
+  end if;
+  v_rol := rol_en(p_asoc);
+  if v_rol = 'encargado' then return true; end if;
+  if v_rol = 'familia' then
+    return p_accion = 'ver' and (cardinality(p_niveles) = 0 or familia_ve_nivel(p_asoc, p_niveles));
+  end if;
+  if v_rol is distinct from 'preceptor' then return false; end if;
+  select * into v_perm from permisos_preceptor where asociacion_id = p_asoc and app_clave = 'actividades';
+  if v_perm is null then return false; end if;
+  if p_accion = 'ver' and not v_perm.puede_ver then return false; end if;
+  if p_accion = 'editar' and not v_perm.puede_editar then return false; end if;
+  if v_perm.ambito = 'todos' then return true; end if;
+  select coalesce(array_agg(nivel), '{}') into v_mios from preceptor_niveles
+    where asociacion_id = p_asoc and email = email_actual();
+  if p_accion = 'ver' then return cardinality(p_niveles) = 0 or p_niveles && v_mios; end if;
+  return cardinality(p_niveles) > 0 and p_niveles <@ v_mios;
+end $$;
+
+alter table planes enable row level security;
+create policy pl_ver on planes for select using (puede_plan(asociacion_id, niveles, 'ver'));
+create policy pl_ins on planes for insert with check (puede_plan(asociacion_id, niveles, 'editar'));
+create policy pl_upd on planes for update
+  using (puede_plan(asociacion_id, niveles, 'editar')) with check (puede_plan(asociacion_id, niveles, 'editar'));
+create policy pl_del on planes for delete using (puede_plan(asociacion_id, niveles, 'editar'));
 

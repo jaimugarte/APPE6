@@ -8,7 +8,10 @@ import { Logo, IconoApp } from './iconos'
 import { useFotoUrl } from './foto'
 import FormularioAlta from './FormularioAlta'
 import Solicitudes from './Solicitudes'
-import FamiliaInicio from './FamiliaInicio'
+import FamiliaHijos from './FamiliaHijos'
+import FamiliaCuotas from './FamiliaCuotas'
+import Actividades from './Actividades'
+import HubFamilia from './HubFamilia'
 
 // ECharts pesa bastante: solo se descarga al abrir Estadísticas
 const Estadisticas = lazy(() => import('./Estadisticas'))
@@ -28,6 +31,7 @@ export default function App() {
   const [ctx, setCtx] = useState(null)
   const [vista, setVista] = useState('hub')
   const [abierta, setAbierta] = useState(null)
+  const [version, setVersion] = useState(0) // sube al cambiar algo en el portal de la familia, para refrescar los resúmenes
   const params = new URLSearchParams(location.search)
   const error = params.get('error_description')
   const alta = params.get('alta') // enlace de invitación: formulario público de alta de familia
@@ -143,7 +147,7 @@ export default function App() {
             </div>
           </div>
           <nav>
-            <button className={vista === 'hub' || vista === 'app' || vista === 'solicitudes' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
+            <button className={vista === 'hub' || vista === 'app' || vista === 'solicitudes' || vista === 'hijos' || vista === 'cuotas' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
             {esEncargado && <button className={vista === 'ajustes' ? 'activo' : ''} onClick={() => setVista('ajustes')}>Ajustes</button>}
             {esAdmin && <button className={vista === 'admin' ? 'activo' : ''} onClick={() => setVista('admin')}>Admin</button>}
             <button onClick={() => supabase.auth.signOut()}>Salir</button>
@@ -152,20 +156,11 @@ export default function App() {
       </header>
 
       {vista === 'hub' && esFamilia && (
-        <FamiliaInicio onCambio={cargar}
-          arriba={fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${mem?.asociaciones?.nombre || 'la asociación'}`} />}
-          abajo={activas.length > 0 && (
-            <div className="grid">
-              {activas.map(a => (
-                <button key={a.app_clave} className="tarjeta" onClick={() => { setAbierta(a); setVista('app') }}>
-                  <span className="icono"><IconoApp clave={a.app_clave} /></span>
-                  <b>{a.apps.nombre}</b>
-                  <span className="desc">{a.apps.descripcion}</span>
-                </button>
-              ))}
-            </div>
-          )} />
+        <HubFamilia fotoUrl={fotoUrl} nombre={mem?.asociaciones?.nombre} activas={activas} version={version}
+          onVista={setVista} onApp={a => { setAbierta(a); setVista('app') }} />
       )}
+      {vista === 'hijos' && esFamilia && <FamiliaHijos onCambio={() => { cargar(); setVersion(v => v + 1) }} />}
+      {vista === 'cuotas' && esFamilia && <FamiliaCuotas />}
       {vista === 'hub' && !esFamilia && (
         <main>
           <h1 className="solo-lectores">Apps de la asociación</h1>
@@ -209,7 +204,9 @@ export default function App() {
         <Suspense fallback={<main><p>Cargando…</p></main>}>
           <Estadisticas asoc={mem.asociacion_id} rol={mem.rol} />
         </Suspense>}
-      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas'].includes(abierta.app_clave) &&
+      {vista === 'app' && abierta?.app_clave === 'actividades' &&
+        <Actividades asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
+      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas', 'actividades'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'solicitudes' && conSolicitudes && <Solicitudes onCambio={cargar} />}
       {vista === 'ajustes' && esEncargado &&

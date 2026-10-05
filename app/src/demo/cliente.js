@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id']
 }
 
 const REL = {
@@ -103,6 +103,26 @@ export function crearClienteDemo() {
   const limpio = (v, n) => String(v ?? '').trim().slice(0, n)
   const reCorreo = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
+  // Equivalente a puede_plan() de la base de datos
+  function puedePlan(u, asoc, niveles, accion) {
+    if (!u || u.asoc !== asoc || !appActiva(u, 'actividades')) return false
+    niveles = niveles || []
+    if (u.rol === 'encargado') return true
+    if (u.rol === 'familia') {
+      if (accion !== 'ver') return false
+      if (niveles.length === 0) return true
+      return db.socios.some(s => esFamiliar(u, s.id) && niveles.includes(s.nivel)
+        && db.periodos_alta.some(p => p.socio_id === s.id && !p.fecha_baja))
+    }
+    if (u.rol !== 'preceptor') return false
+    const p = permiso(u, 'actividades')
+    if (!p || !(accion === 'ver' ? p.puede_ver : p.puede_editar)) return false
+    if (p.ambito === 'todos') return true
+    const mios = db.preceptor_niveles.filter(n => n.asociacion_id === asoc && n.email === u.email).map(n => n.nivel)
+    if (accion === 'ver') return niveles.length === 0 || niveles.some(n => mios.includes(n))
+    return niveles.length > 0 && niveles.every(n => mios.includes(n))
+  }
+
   function visible(tabla, r) {
     const u = ctx(); if (!u) return false
     switch (tabla) {
@@ -127,6 +147,7 @@ export function crearClienteDemo() {
       case 'permisos_aprobacion': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.email === u.email)
       case 'pagos_cuota': { const f = db.familias.find(x => x.id === r.familia_id); return !!f && f.asociacion_id === u.asoc && (u.rol === 'encargado' || f.emails.includes(u.email)) }
       case 'config_cuotas': return r.asociacion_id === u.asoc && u.rol === 'encargado'
+      case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'ver')
       case 'solicitudes_alta': return puedeAprobar(u, r.asociacion_id, r.niveles) || r.email === u.email
       default: return false
     }
@@ -143,6 +164,7 @@ export function crearClienteDemo() {
       case 'accesos_permitidos': return u.admin || (u.rol === 'encargado' && r.asociacion_id === u.asoc && r.rol !== 'encargado')
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
+      case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
       case 'pagos_cuota': return u.rol === 'encargado' && db.familias.find(x => x.id === r.familia_id)?.asociacion_id === u.asoc
       default: return false
     }
@@ -159,6 +181,7 @@ export function crearClienteDemo() {
     if (tabla === 'permisos_preceptor') { f.puede_ver ??= false; f.puede_editar ??= false; f.ambito ??= 'su_nivel' }
     if (tabla === 'asociacion_apps') { f.permitida ??= false; f.activa ??= false }
     if (tabla === 'periodos_alta') { f.fecha_baja ??= null; f.motivo_baja ??= null }
+    if (tabla === 'planes') { f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
     if (tabla === 'enlaces_alta') { f.token ??= (uuid() + uuid()).replaceAll('-', ''); f.activo ??= true; f.caduca_en ??= null; f.creado_en ??= hoyIso }
     return f

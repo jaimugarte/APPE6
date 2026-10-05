@@ -318,3 +318,41 @@ input.importe { width: 84px; min-height: 40px; text-align: right; }
 .tablaw .num { text-align: right; }
 .registro-pagos { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--linea); }
 .registro-pagos h3 { margin: 0 0 4px; font-size: .95rem; }
+
+/* ---------- Actividades (planes) ---------- */
+.formgrid > .ancho { grid-column: 1 / -1; }
+.barra-act { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--acento-suave); border-radius: 999px; }
+.seg button { min-height: 34px; padding: 4px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--acento); font-size: .875rem; }
+.seg button.on { background: var(--acento); color: #fff; font-weight: 600; }
+.nav-per { display: flex; align-items: center; gap: 6px; }
+.nav-per button { min-height: 38px; min-width: 38px; padding: 0 10px; }
+.nav-per b { min-width: 9.5ch; text-align: center; font-size: .9rem; }
+.nav-per .mini { min-height: 32px; font-size: .8125rem; }
+.dia-bloque { margin-bottom: 14px; }
+.dia-bloque h3 { font-size: 1rem; display: flex; align-items: center; gap: 4px; margin-bottom: 6px; color: var(--tinta-2); }
+.dia-bloque.hoy h3 { color: var(--acento); }
+.vacio-dia { margin: 0 0 4px; font-size: .8125rem; }
+.plan { display: grid; gap: 6px; margin-bottom: 8px; padding: 12px 16px; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-md); }
+.plan-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.plan-cab b { font-family: var(--serif); font-size: 1.05rem; font-weight: 600; }
+.plan .precio { font-weight: 600; font-size: .875rem; color: var(--tinta); white-space: nowrap; }
+.plan .precio.gratis { color: var(--si); }
+.plan .meta { display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--tinta-3); }
+.plan .chips { margin: 0; }
+.plan .chip { font-size: .75rem; padding: 2px 10px; }
+.plan-desc { margin: 0; color: var(--tinta-2); font-size: .9rem; }
+.mes-rejilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 16px; padding: 10px; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-md); text-align: center; }
+.mes-rejilla .cab { color: var(--tinta-3); font-size: .75rem; }
+.mes-rejilla .dia { position: relative; display: grid; place-items: center; min-height: 38px; border-radius: 10px; font-size: .875rem; }
+.mes-rejilla .dia.hoy { border: 1px solid var(--acento-borde); font-weight: 600; }
+.mes-rejilla .dia.con { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+.mes-rejilla .dia i { position: absolute; bottom: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--acento); }
+
+/* ---------- Inicio de la familia: cajas con resumen en vivo ---------- */
+.cuota-grande { display: grid; gap: 2px; margin-bottom: 10px; padding: 14px 16px; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-md); }
+.cuota-grande span { color: var(--tinta-2); font-size: .8125rem; }
+.cuota-grande b { font-family: var(--serif); font-size: 1.75rem; font-weight: 600; line-height: 1.15; }
+.cuota-grande b small { font-family: var(--sans); font-size: .875rem; font-weight: 400; color: var(--tinta-3); margin-left: 2px; }
+.tarjeta .resumen-tarjeta { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--linea); font-size: .8125rem; color: var(--tinta); }
+.tarjeta .resumen-tarjeta .badge { margin-left: 0; }

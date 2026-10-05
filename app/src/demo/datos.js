@@ -66,13 +66,15 @@ export function crearBD() {
       { clave: 'socios', nombre: 'Socios', descripcion: 'Base de datos de socios, altas y bajas' },
       { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a actividades' },
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
-      { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Planes y avisos (futuro)' },
+      { clave: 'actividades', nombre: 'Actividades', descripcion: 'Planes y actividades de la asociación' },
+      { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
     asociacion_apps: [
       { asociacion_id: ASOC, app_clave: 'socios', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'asistencia', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'estadisticas', permitida: true, activa: true },
+      { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
     ],
     accesos_permitidos: [
@@ -89,7 +91,8 @@ export function crearBD() {
     permisos_preceptor: [
       { asociacion_id: ASOC, app_clave: 'socios', puede_ver: true, puede_editar: true, ambito: 'su_nivel' },
       { asociacion_id: ASOC, app_clave: 'asistencia', puede_ver: true, puede_editar: true, ambito: 'su_nivel' },
-      { asociacion_id: ASOC, app_clave: 'estadisticas', puede_ver: true, puede_editar: false, ambito: 'su_nivel' }
+      { asociacion_id: ASOC, app_clave: 'estadisticas', puede_ver: true, puede_editar: false, ambito: 'su_nivel' },
+      { asociacion_id: ASOC, app_clave: 'actividades', puede_ver: true, puede_editar: true, ambito: 'su_nivel' }
     ],
     preceptor_niveles: [
       { asociacion_id: ASOC, email: 'preceptor@demo.es', nivel: '1º ESO' },
@@ -106,6 +109,7 @@ export function crearBD() {
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
       direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
+    planes: [],
     pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
@@ -129,6 +133,18 @@ export function crearBD() {
     db.pagos_cuota.push({ familia_id: 'f-1', mes, importe: i > 3 ? 45 : 40.5,
       pagado_en: i === 0 ? null : `${mes.slice(0, 8)}0${2 + (i % 5)}`, nota: null })
   }
+
+  // ---- Planes de ejemplo, alrededor de la semana en curso ----
+  const lunes = inicioPeriodo(H, 'semanal')
+  const dia = k => sumarPeriodos(lunes, 'semanal', 0) && iso(new Date(deIso(lunes).getTime() + k * 864e5 + 36e5 * 2))
+  const plan = (id, k, kFin, titulo, niveles, extra) => db.planes.push({
+    id, asociacion_id: ASOC, titulo, descripcion: null, lugar: null, hora_inicio: null, hora_fin: null, precio: 0,
+    niveles, fecha: dia(k), fecha_fin: dia(kFin), creado_por: 'u-enc', creado_en: H, ...extra })
+  plan('pl-1', 2, 2, 'Torneo de fútbol', [], { descripcion: 'Torneo entre todos los niveles. Trae calzado deportivo y agua.', lugar: 'Polideportivo municipal', hora_inicio: '17:30', hora_fin: '20:00', precio: 3 })
+  plan('pl-2', 5, 5, 'Excursión al monte', ['1º ESO', '2º ESO'], { descripcion: 'Ruta de senderismo de 8 km. Comida de bolsillo.', lugar: 'Sierra norte', hora_inicio: '09:00', hora_fin: '18:00', precio: 12 })
+  plan('pl-3', 3, 3, 'Cine-fórum', ['6º primaria'], { descripcion: 'Película y charla posterior.', lugar: 'Sede del club', hora_inicio: '18:00', hora_fin: '20:00' })
+  plan('pl-4', 9, 9, 'Gymkana de otoño', ['3º ESO'], { lugar: 'Parque central', hora_inicio: '11:00', precio: 2 })
+  plan('pl-5', 12, 13, 'Convivencia de fin de semana', [], { descripcion: 'Dos días en la casa de colonias.', lugar: 'Casa de colonias', precio: 45 })
 
   // ---- Socios, altas y bajas ----
   let n = 0

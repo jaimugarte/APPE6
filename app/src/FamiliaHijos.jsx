@@ -1,37 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { fecha, edad, nivelPorNacimiento } from './util'
-import { eur } from './cuotas'
 import ConfirmarBaja from './ConfirmarBaja'
 
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
 const VACIO_HIJO = { nombre: '', apellidos: '', fecha_nacimiento: '', alergias: '', correo_socio: '' }
 
-// Inicio de la familia: resumen de cuota, lista de hijos con su estado y acceso a los datos de la familia.
-// Las familias no ven Socios ni Solicitudes: aquí lo tienen todo.
-export default function FamiliaInicio({ onCambio, arriba, abajo }) {
+// Hijos socios de la familia: lista con su estado (Activo / Baja / Alta solicitada), alta de otro hijo,
+// ficha de cada uno (con la baja) y datos de la familia.
+export default function FamiliaHijos({ onCambio }) {
   const [hijos, setHijos] = useState(null)
   const [pendientes, setPendientes] = useState([])
   const [familia, setFamilia] = useState(null)
-  const [cuota, setCuota] = useState(null)
-  const [vista, setVista] = useState('inicio') // 'inicio' | 'familia' | 'nuevo' | 'pagos' | id de hijo
-  const [desglose, setDesglose] = useState(false)
+  const [vista, setVista] = useState('lista') // 'lista' | 'familia' | 'nuevo' | id de hijo
   const [msg, setMsg] = useState('')
 
   const cargar = useCallback(async () => {
-    const [s, sol, fam, q] = await Promise.all([
+    const [s, sol, fam] = await Promise.all([
       supabase.from('socios')
         .select('id, nombre, apellidos, nivel, fecha_nacimiento, alergias, correo_socio, periodos_alta(fecha_alta, fecha_baja, motivo_baja)')
         .order('nombre'),
       supabase.from('solicitudes_alta').select('*').eq('tipo', 'socio').order('creada_en', { ascending: false }),
-      supabase.from('familias').select('*').maybeSingle(),
-      supabase.rpc('cuota_familia')
+      supabase.from('familias').select('*').maybeSingle()
     ])
     setMsg(s.error?.message || sol.error?.message || '')
     setHijos(s.data || [])
     setPendientes(sol.data || [])
     setFamilia(fam.data || null)
-    setCuota(q.data || null)
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
@@ -39,19 +34,13 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
 
   if (hijos === null) return <main><p>Cargando…</p></main>
 
-  if (vista === 'familia')
-    return <DatosFamilia familia={familia} onVolver={() => setVista('inicio')} onCambio={cambio} />
-  if (vista === 'pagos')
-    return <HistorialPagos familiaId={cuota?.familia_id} onVolver={() => setVista('inicio')} />
-  if (vista === 'nuevo')
-    return <NuevoHijo onVolver={() => setVista('inicio')} onCambio={cambio} />
-  if (vista !== 'inicio') {
+  if (vista === 'familia') return <DatosFamilia familia={familia} onVolver={() => setVista('lista')} onCambio={cambio} />
+  if (vista === 'nuevo') return <NuevoHijo onVolver={() => setVista('lista')} onCambio={cambio} />
+  if (vista !== 'lista') {
     const h = hijos.find(x => x.id === vista)
-    if (h) return <FichaHijo hijo={h} cuota={cuota} onVolver={() => setVista('inicio')} onCambio={cambio} />
+    if (h) return <FichaHijo hijo={h} onVolver={() => setVista('lista')} onCambio={cambio} />
   }
 
-  const activos = hijos.filter(abierto)
-  const importe = id => cuota?.detalle?.find(d => d.socio_id === id)?.importe
   // Altas pendientes y rechazadas recientes (las aprobadas ya aparecen como hijo)
   const hace30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)
   const solicitudes = pendientes.filter(s => s.estado === 'pendiente' || (s.estado === 'rechazada' && (s.resuelta_en || s.creada_en).slice(0, 10) >= hace30))
@@ -62,36 +51,11 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
 
   return (
     <main className="familia-inicio">
-      {arriba}
-      <section className="resumen-cuota">
-        <div className="kpis dos">
-          <div className="kpi"><span>Hijos socios</span><b>{activos.length}</b></div>
-          <div className="kpi cuota">
-            <button className="kpi-btn" aria-expanded={desglose} onClick={() => setDesglose(d => !d)} disabled={!cuota}>
-              <span>Cuota mensual total</span>
-              <b>{cuota ? eur(cuota.total) : '—'}<small>/mes</small></b>
-            </button>
-            {cuota && <button className="enlace-mini" onClick={() => setVista('pagos')}>Ver historial de pagos</button>}
-          </div>
-        </div>
-        {desglose && cuota && (
-          <div className="desglose">
-            {cuota.detalle.map(d => {
-              const h = hijos.find(x => x.id === d.socio_id)
-              return <div key={d.socio_id}><span>{h ? `${h.nombre} ${h.apellidos}` : 'Hijo/a'}</span><b>{eur(d.importe)}</b></div>
-            })}
-            {cuota.descuento > 0 && <div><span>Descuento</span><b>−{eur(cuota.descuento)}</b></div>}
-            <div className="total"><span>Total al mes</span><b>{eur(cuota.total)}</b></div>
-          </div>
-        )}
-      </section>
-
-      {msg && <p className="error">{msg}</p>}
-
       <div className="barra">
-        <h2>Mis hijos</h2>
+        <h2>Hijos socios</h2>
         <button className="primario" onClick={() => setVista('nuevo')}>+ Dar de alta otro hijo/a</button>
       </div>
+      {msg && <p className="error">{msg}</p>}
 
       {filas.length === 0 && <p className="aviso">Todavía no hay ningún hijo. Pulsa «Dar de alta otro hijo/a» para solicitar el primero.</p>}
       {filas.map(({ clave, hijo, sol }) => {
@@ -104,7 +68,6 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
                 <small className="meta">
                   {hijo.nivel && <span>{hijo.nivel}</span>}
                   {a != null && <span>{a} años</span>}
-                  {act && importe(hijo.id) != null && <span>{eur(importe(hijo.id))}/mes</span>}
                 </small>
               </span>
               <span className={act ? 'badge ok' : 'badge baja'}>{act ? 'Activo' : 'Baja'}</span>
@@ -129,7 +92,6 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
       })}
 
       <div className="fila"><button onClick={() => setVista('familia')}>Datos de la familia</button></div>
-      {abajo}
     </main>
   )
 }
@@ -177,13 +139,12 @@ function NuevoHijo({ onVolver, onCambio }) {
   )
 }
 
-function FichaHijo({ hijo, cuota, onVolver, onCambio }) {
+function FichaHijo({ hijo, onVolver, onCambio }) {
   const [f, setF] = useState(() => Object.fromEntries(Object.keys(VACIO_HIJO).map(k => [k, hijo[k] ?? ''])))
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState('')
   const [baja, setBaja] = useState(false)
   const act = abierto(hijo)
-  const importe = cuota?.detalle?.find(d => d.socio_id === hijo.id)?.importe
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const ultimaBaja = [...(hijo.periodos_alta || [])].filter(p => p.fecha_baja).sort((a, b) => b.fecha_baja.localeCompare(a.fecha_baja))[0]
 
@@ -216,7 +177,7 @@ function FichaHijo({ hijo, cuota, onVolver, onCambio }) {
           <Campo label="Correo del hijo/a"><input type="email" value={f.correo_socio} onChange={set('correo_socio')} /></Campo>
           <Campo label="Alergias" ancho><textarea rows={2} value={f.alergias} onChange={set('alergias')} /></Campo>
         </div>
-        {hijo.nivel && <p className="aviso">Nivel: <b>{hijo.nivel}</b> (lo gestiona la asociación).{act && importe != null && <> Cuota: <b>{eur(importe)}/mes</b>.</>}</p>}
+        {hijo.nivel && <p className="aviso">Nivel: <b>{hijo.nivel}</b> (lo gestiona la asociación).</p>}
         <div className="fila">
           <button className="primario" onClick={guardar}>Guardar</button>
           {msg && <span className="error">{msg}</span>}
@@ -293,38 +254,3 @@ function DatosFamilia({ familia, onVolver, onCambio }) {
   )
 }
 
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-
-// Pagos de cuota, un mes por fila, del más reciente al más antiguo
-function HistorialPagos({ familiaId, onVolver }) {
-  const [pagos, setPagos] = useState(null)
-  useEffect(() => {
-    if (!familiaId) return setPagos([])
-    supabase.from('pagos_cuota').select('mes, importe, pagado_en').eq('familia_id', familiaId).order('mes', { ascending: false })
-      .then(({ data }) => setPagos(data || []))
-  }, [familiaId])
-
-  return (
-    <main>
-      <div className="barra"><button onClick={onVolver}>← Volver</button><h2>Historial de pagos</h2></div>
-      {pagos === null && <p>Cargando…</p>}
-      {pagos?.length === 0 && <p className="aviso">Todavía no hay pagos registrados.</p>}
-      {pagos?.length > 0 && (
-        <div className="tablaw">
-          <table>
-            <thead><tr><th>Mes</th><th className="num">Importe</th><th>Estado</th></tr></thead>
-            <tbody>
-              {[...pagos].sort((a, b) => b.mes.localeCompare(a.mes)).map(p => (
-                <tr key={p.mes}>
-                  <td>{MESES[Number(p.mes.slice(5, 7)) - 1]} {p.mes.slice(0, 4)}</td>
-                  <td className="num">{eur(p.importe)}</td>
-                  <td>{p.pagado_en ? <span className="badge ok">Pagado {fecha(p.pagado_en)}</span> : <span className="badge pend">Pendiente</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </main>
-  )
-}

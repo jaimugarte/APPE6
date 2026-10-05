@@ -14,6 +14,12 @@ export function IconoApp({ clave, size = 22 }) {
       return <svg {...p}><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1Z" /><path d="M17 9.5a3.5 3.5 0 0 1 0 5" /></svg>
     case 'fotos':
       return <svg {...p}><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.2-2h5.6L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" /><circle cx="12" cy="13" r="3.2" /></svg>
+    case 'actividades':
+      return <svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="3" /><path d="M8 3.5v4M16 3.5v4M4 10h16" /><path d="m9 15 2 2 4-4" /></svg>
+    case 'hijos':
+      return <svg {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path d="M18 8v6M15 11h6" /></svg>
+    case 'cuotas':
+      return <svg {...p}><rect x="3.5" y="6" width="17" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M7 12h.01M17 12h.01" /></svg>
     case 'solicitudes':
       return <svg {...p}><path d="M4 13.5 6.2 6.6A1.5 1.5 0 0 1 7.6 5.5h8.8a1.5 1.5 0 0 1 1.4 1.1L20 13.5" /><path d="M4 13.5V18a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18v-4.5h-4.2a3.8 3.8 0 0 1-7.6 0Z" /></svg>
     default:

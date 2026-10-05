@@ -63,3 +63,17 @@ El encargado crea un **enlace de invitación** en Ajustes y lo reparte a las fam
 Las familias no ven Socios ni Solicitudes: su inicio muestra el resumen (hijos de alta y cuota mensual, con el descuento si lo tienen), la lista de hijos con su estado (Activo / Baja / Alta solicitada), «Dar de alta otro hijo/a» y «Datos de la familia». Dentro de cada hijo editan sus datos y pueden darlo de baja. El nivel no se elige: sale de la fecha de nacimiento (curso que empieza el 1 de septiembre) y lo gestiona la asociación.
 
 Cuota: en Ajustes el encargado define el importe mensual por orden de hermano (por defecto 35 € el hijo de alta más antiguo, 10 € el segundo y 0 € el resto; el último tramo vale para los siguientes). Los descuentos son por familia (en % o en €/mes) y los pone el encargado, o los preceptores si el encargado lo permite, desde la ficha del socio. Las familias no pueden pedirlos desde la app.
+
+## Actividades (planes)
+
+App `actividades`: el encargado y los preceptores con permiso de **editar** publican planes (título, fecha o varios días, horas, lugar, **precio** y **descripción**) dirigidos a todos los niveles o a algunos. Se ven por **semana** (por defecto) o por **mes**.
+
+- Las familias ven los planes de los niveles de sus hijos de alta, y los dirigidos a todos.
+- Un preceptor con ámbito «Solo su nivel» solo crea o edita planes de sus propios niveles (no para todos los niveles); con «Todos los niveles», cualquiera.
+- El precio es informativo: no se suma a las cuotas.
+- El administrador global debe conceder la app «Actividades» a la asociación y el encargado activarla; luego, en Ajustes → Permisos, decide qué puede hacer cada preceptor.
+- Tras actualizar el código, vuelve a ejecutar `supabase/schema.sql` (nueva tabla `planes` y nueva app).
+
+## Portal de la familia
+
+El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Actividades**.
