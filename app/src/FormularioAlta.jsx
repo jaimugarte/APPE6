@@ -4,8 +4,8 @@ import { NIVELES, esEmail } from './util'
 import { Logo } from './iconos'
 
 const VACIO = {
-  nombre_padre: '', nombre_madre: '', correo_padre: '', correo_madre: '', movil_padre: '', movil_madre: '',
-  direccion: '', email: '', email2: '', niveles: [], consentimiento: false, web: ''
+  nombre_padre: '', correo_padre: '', movil_padre: '', nombre_madre: '', correo_madre: '', movil_madre: '',
+  direccion: '', niveles: [], consentimiento: false, web: ''
 }
 
 // Formulario público (sin iniciar sesión) al que lleva el enlace de invitación: solicitud de alta de una familia.
@@ -27,9 +27,12 @@ export default function FormularioAlta({ token }) {
     e.preventDefault()
     setError('')
     if (f.web) return setHecho(true) // campo trampa para robots: se simula el envío
-    if (!f.nombre_padre.trim() && !f.nombre_madre.trim()) return setError('Indica al menos el nombre del padre o de la madre.')
-    if (!f.email.trim() || !esEmail(f.email.trim())) return setError('Escribe un correo de Google válido para entrar a la aplicación.')
-    if (!esEmail(f.email2.trim())) return setError('El segundo correo no es válido.')
+    const cp = f.correo_padre.trim(), cm = f.correo_madre.trim()
+    const hayPadre = f.nombre_padre.trim() || cp, hayMadre = f.nombre_madre.trim() || cm
+    if (!hayPadre && !hayMadre) return setError('Indica al menos un progenitor o tutor, con su nombre y su correo de Google.')
+    if (hayPadre && (!f.nombre_padre.trim() || !cp || !esEmail(cp))) return setError('Revisa el nombre y el correo de Google del padre o tutor.')
+    if (hayMadre && (!f.nombre_madre.trim() || !cm || !esEmail(cm))) return setError('Revisa el nombre y el correo de Google de la madre o tutora.')
+    if (cp && cp.toLowerCase() === cm.toLowerCase()) return setError('El padre y la madre necesitan correos distintos.')
     if (!f.consentimiento) return setError('Debes aceptar el tratamiento de los datos para enviar la solicitud.')
     setEnviando(true)
     const { web: _web, ...datos } = f
@@ -61,7 +64,7 @@ export default function FormularioAlta({ token }) {
       <main className="centro">
         {cabecera}
         <h2>Solicitud enviada</h2>
-        <p>Gracias. La asociación revisará tu solicitud. Cuando la aprueben podrás entrar con tu cuenta de Google ({f.email.trim() || 'la que has indicado'}) y dar de alta a tus hijos.</p>
+        <p>Gracias. La asociación revisará tu solicitud. Cuando la aprueben podréis entrar con las cuentas de Google que habéis indicado y dar de alta a vuestros hijos.</p>
         <p className="aviso">No recibirás ningún aviso automático: vuelve a entrar en unos días o pregunta al encargado.</p>
         <button className="primario" onClick={() => { location.href = location.pathname }}>Ir a la aplicación</button>
       </main>
@@ -73,26 +76,26 @@ export default function FormularioAlta({ token }) {
       <p className="sub">Solicitud de alta de familia. Primero das de alta a tu familia y, cuando la aprueben, podrás añadir a cada hijo desde la aplicación.</p>
       <form onSubmit={enviar} noValidate>
         <section>
-          <h2>Cuenta para entrar</h2>
-          <label className="campo">Correo de Google *
-            <input type="email" inputMode="email" autoComplete="email" value={f.email} onChange={set('email')} placeholder="tucorreo@gmail.com" />
-            <small>Es la cuenta con la que entrarás a la aplicación.</small>
+          <h2>Padre o tutor</h2>
+          <p className="sub">Cada progenitor o tutor entrará con su propia cuenta de Google. Rellena los que vayan a usar la aplicación (basta con uno).</p>
+          <label className="campo">Nombre y apellidos<input value={f.nombre_padre} onChange={set('nombre_padre')} autoComplete="off" /></label>
+          <label className="campo">Correo de Google
+            <input type="email" inputMode="email" value={f.correo_padre} onChange={set('correo_padre')} placeholder="tucorreo@gmail.com" />
           </label>
-          <label className="campo">Segunda cuenta de Google (opcional)
-            <input type="email" inputMode="email" value={f.email2} onChange={set('email2')} placeholder="la del otro progenitor" />
-          </label>
+          <label className="campo">Móvil<input type="tel" inputMode="tel" value={f.movil_padre} onChange={set('movil_padre')} /></label>
         </section>
 
         <section>
-          <h2>Padre y madre</h2>
-          <div className="dos-col">
-            <label className="campo">Nombre del padre<input value={f.nombre_padre} onChange={set('nombre_padre')} autoComplete="off" /></label>
-            <label className="campo">Nombre de la madre<input value={f.nombre_madre} onChange={set('nombre_madre')} autoComplete="off" /></label>
-            <label className="campo">Móvil del padre<input type="tel" inputMode="tel" value={f.movil_padre} onChange={set('movil_padre')} /></label>
-            <label className="campo">Móvil de la madre<input type="tel" inputMode="tel" value={f.movil_madre} onChange={set('movil_madre')} /></label>
-            <label className="campo">Correo del padre<input type="email" value={f.correo_padre} onChange={set('correo_padre')} /></label>
-            <label className="campo">Correo de la madre<input type="email" value={f.correo_madre} onChange={set('correo_madre')} /></label>
-          </div>
+          <h2>Madre o tutora</h2>
+          <label className="campo">Nombre y apellidos<input value={f.nombre_madre} onChange={set('nombre_madre')} autoComplete="off" /></label>
+          <label className="campo">Correo de Google
+            <input type="email" inputMode="email" value={f.correo_madre} onChange={set('correo_madre')} placeholder="sucorreo@gmail.com" />
+          </label>
+          <label className="campo">Móvil<input type="tel" inputMode="tel" value={f.movil_madre} onChange={set('movil_madre')} /></label>
+        </section>
+
+        <section>
+          <h2>Domicilio</h2>
           <label className="campo">Dirección<input value={f.direccion} onChange={set('direccion')} autoComplete="street-address" /></label>
         </section>
 

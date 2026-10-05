@@ -107,15 +107,15 @@ export function crearBD() {
       direccion: 'Calle Mayor 1, 2º', creada_en: H }],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
-      { id: 'sol-1', asociacion_id: ASOC, tipo: 'familia', estado: 'pendiente', email: 'nueva.familia@example.com',
-        niveles: ['1º ESO', '5º primaria'], socio_id: null, motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
-        datos: { email2: 'segunda.cuenta@example.com', nombre_padre: 'Jorge Nuevo', nombre_madre: 'Elisa Familia', correo_padre: '', correo_madre: '',
+      { id: 'sol-1', asociacion_id: ASOC, tipo: 'familia', estado: 'pendiente', email: 'jorge.nuevo@example.com',
+        niveles: ['1º ESO', '5º primaria'], motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
+        datos: { nombre_padre: 'Jorge Nuevo', nombre_madre: 'Elisa Familia', correo_padre: 'jorge.nuevo@example.com', correo_madre: 'elisa.familia@example.com',
           movil_padre: '611000111', movil_madre: '', direccion: 'Avenida de la Paz 12' } },
-      { id: 'sol-2', asociacion_id: ASOC, tipo: 'familia', estado: 'pendiente', email: 'otra.familia@example.com',
-        niveles: ['3º ESO'], socio_id: null, motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
-        datos: { email2: null, nombre_padre: '', nombre_madre: 'Rosa Otra', correo_padre: '', correo_madre: '', movil_padre: '', movil_madre: '622000333', direccion: '' } },
+      { id: 'sol-2', asociacion_id: ASOC, tipo: 'familia', estado: 'pendiente', email: 'rosa.otra@example.com',
+        niveles: ['3º ESO'], motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
+        datos: { nombre_padre: '', nombre_madre: 'Rosa Otra', correo_padre: '', correo_madre: 'rosa.otra@example.com', movil_padre: '', movil_madre: '622000333', direccion: '' } },
       { id: 'sol-3', asociacion_id: ASOC, tipo: 'socio', estado: 'pendiente', email: 'familia@demo.es',
-        niveles: ['2º ESO'], socio_id: null, motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
+        niveles: ['2º ESO'], motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
         datos: { nombre: 'Lucas', apellidos: 'Demo Prueba', fecha_nacimiento: '2013-05-20', nivel: '2º ESO', alergias: '', correo_socio: '' } }
     ]
   }

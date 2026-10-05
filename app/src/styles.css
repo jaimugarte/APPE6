@@ -268,7 +268,6 @@ input.abrev { width: 84px; min-height: 40px; text-align: center; text-transform:
 .solicitud header small { margin-left: auto; color: var(--tinta-3); }
 .badge.tipo-familia { background: #e6eefb; color: var(--acento); }
 .badge.tipo-socio { background: #e3f4ea; color: #17673a; }
-.badge.tipo-baja { background: #fbe7e4; color: #9b2318; }
 .datos { display: grid; gap: 2px; }
 .dato { display: flex; gap: 8px; font-size: .9rem; }
 .dato span { flex: none; width: 128px; color: var(--tinta-3); }
@@ -291,3 +290,6 @@ input.abrev { width: 84px; min-height: 40px; text-align: center; text-transform:
 .consentimiento input { margin-top: 4px; }
 .trampa { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .formulario-alta .primario { width: 100%; min-height: 48px; }
+.actividad.hijo { flex-wrap: wrap; padding: 6px 0; }
+.confirmar-baja { flex: 1 1 100%; display: grid; gap: 8px; padding: 10px 12px; margin: 4px 0; background: #fdf3f1; border: 1px solid #f0c9c4; border-radius: var(--r-md); }
+.confirmar-baja p { margin: 0; }

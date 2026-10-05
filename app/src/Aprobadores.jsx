@@ -27,7 +27,7 @@ export default function Aprobadores({ asoc }) {
   return (
     <section>
       <h2>Quién aprueba las solicitudes</h2>
-      <p className="sub">Altas de familias y de hijos, y bajas. «Su nivel» usa los niveles asignados a cada preceptor más abajo; una solicitud de familia llega al preceptor de cualquiera de los niveles que la familia haya indicado.</p>
+      <p className="sub">Altas de familias y de hijos (las bajas las hacen las propias familias, con confirmación). «Su nivel» usa los niveles asignados a cada preceptor más abajo; una solicitud de familia llega al preceptor de cualquiera de los niveles que la familia haya indicado.</p>
       {msg && <p className="error">{msg}</p>}
       {preceptores.length === 0 && <p className="aviso">Todavía no has autorizado a ningún preceptor.</p>}
       {preceptores.map(p => (

@@ -308,20 +308,22 @@ export function crearClienteDemo() {
         const enl = enlaceVigente(a.p_token), t = a.p_datos || {}
         if (!enl) return err('P0001', 'El enlace no es válido o ha caducado')
         if (t.consentimiento !== true) return err('P0001', 'Debes aceptar el tratamiento de los datos')
-        const email = limpio(t.email, 120).toLowerCase()
-        let email2 = limpio(t.email2, 120).toLowerCase() || null
-        if (email2 === email) email2 = null
-        if (!reCorreo.test(email) || (email2 && !reCorreo.test(email2))) return err('P0001', 'Correo no válido')
-        if (!limpio(t.nombre_padre, 120) && !limpio(t.nombre_madre, 120)) return err('P0001', 'Indica al menos el nombre del padre o de la madre')
-        if (db.accesos_permitidos.some(x => x.email === email || x.email === email2)) return err('P0001', 'Ese correo ya tiene acceso a la aplicación')
-        if (db.solicitudes_alta.some(x => x.asociacion_id === enl.asociacion_id && x.tipo === 'familia' && x.estado === 'pendiente' && x.email === email))
-          return err('P0001', 'Ya hay una solicitud pendiente con ese correo')
+        const np = limpio(t.nombre_padre, 120), nm = limpio(t.nombre_madre, 120)
+        const cp = limpio(t.correo_padre, 120).toLowerCase(), cm = limpio(t.correo_madre, 120).toLowerCase()
+        if ((np || cp) && (!np || !reCorreo.test(cp))) return err('P0001', 'Revisa el nombre y el correo de Google del padre o tutor')
+        if ((nm || cm) && (!nm || !reCorreo.test(cm))) return err('P0001', 'Revisa el nombre y el correo de Google de la madre o tutora')
+        if (!cp && !cm) return err('P0001', 'Indica al menos un progenitor o tutor con su correo de Google')
+        if (cp === cm) return err('P0001', 'El padre y la madre necesitan correos distintos')
+        const emails = [cp, cm].filter(Boolean)
+        if (db.accesos_permitidos.some(x => emails.includes(x.email))) return err('P0001', 'Alguno de esos correos ya tiene acceso a la aplicación')
+        if (db.solicitudes_alta.some(x => x.asociacion_id === enl.asociacion_id && x.tipo === 'familia' && x.estado === 'pendiente'
+          && (emails.includes(x.email) || emails.includes(x.datos.correo_padre) || emails.includes(x.datos.correo_madre))))
+          return err('P0001', 'Ya hay una solicitud pendiente con alguno de esos correos')
         db.solicitudes_alta.push({
-          id: uuid(), asociacion_id: enl.asociacion_id, tipo: 'familia', estado: 'pendiente', email,
-          niveles: (Array.isArray(t.niveles) ? t.niveles : []).slice(0, 8).map(n => limpio(n, 40)), socio_id: null,
+          id: uuid(), asociacion_id: enl.asociacion_id, tipo: 'familia', estado: 'pendiente', email: emails[0],
+          niveles: (Array.isArray(t.niveles) ? t.niveles : []).slice(0, 8).map(n => limpio(n, 40)),
           motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
-          datos: { email2, nombre_padre: limpio(t.nombre_padre, 120), nombre_madre: limpio(t.nombre_madre, 120),
-            correo_padre: limpio(t.correo_padre, 120), correo_madre: limpio(t.correo_madre, 120),
+          datos: { nombre_padre: np, nombre_madre: nm, correo_padre: cp, correo_madre: cm,
             movil_padre: limpio(t.movil_padre, 30), movil_madre: limpio(t.movil_madre, 30), direccion: limpio(t.direccion, 200) }
         })
         return { data: null, error: null }
@@ -331,24 +333,20 @@ export function crearClienteDemo() {
         const t = a.p_datos || {}, nivel = limpio(t.nivel, 40)
         if (!limpio(t.nombre, 80) || !limpio(t.apellidos, 120) || !nivel) return err('P0001', 'Faltan datos obligatorios')
         db.solicitudes_alta.push({
-          id: uuid(), asociacion_id: u.asoc, tipo: 'socio', estado: 'pendiente', email: u.email, niveles: [nivel], socio_id: null,
+          id: uuid(), asociacion_id: u.asoc, tipo: 'socio', estado: 'pendiente', email: u.email, niveles: [nivel],
           motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
           datos: { nombre: limpio(t.nombre, 80), apellidos: limpio(t.apellidos, 120), fecha_nacimiento: limpio(t.fecha_nacimiento, 10),
             nivel, alergias: limpio(t.alergias, 200), correo_socio: limpio(t.correo_socio, 120) }
         })
         return { data: null, error: null }
       }
-      if (nombre === 'solicitar_baja') {
+      if (nombre === 'dar_de_baja_familia') {
         const s = socioDe(a.p_socio)
-        if (!u || !s || !esFamiliar(u, s.id)) return err('P0001', 'No puedes solicitar la baja de este socio')
-        if (!db.periodos_alta.some(p => p.socio_id === s.id && !p.fecha_baja)) return err('P0001', 'Este socio ya está de baja')
-        if (db.solicitudes_alta.some(x => x.tipo === 'baja' && x.estado === 'pendiente' && x.socio_id === s.id))
-          return err('P0001', 'Ya hay una solicitud de baja pendiente para este socio')
-        db.solicitudes_alta.push({
-          id: uuid(), asociacion_id: s.asociacion_id, tipo: 'baja', estado: 'pendiente', email: u.email, niveles: [s.nivel || ''],
-          socio_id: s.id, motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
-          datos: { motivo: limpio(a.p_motivo, 300), socio_nombre: `${s.nombre} ${s.apellidos}` }
-        })
+        if (!u || !s || !esFamiliar(u, s.id)) return err('P0001', 'No puedes dar de baja a este socio')
+        const p = db.periodos_alta.find(x => x.socio_id === s.id && !x.fecha_baja)
+        if (!p) return err('P0001', 'Este socio ya está de baja')
+        p.fecha_baja = hoyIso < p.fecha_alta ? p.fecha_alta : hoyIso
+        p.motivo_baja = limpio(a.p_motivo, 300) || null
         return { data: null, error: null }
       }
       if (nombre === 'resolver_solicitud') {
@@ -358,7 +356,7 @@ export function crearClienteDemo() {
         const d = s.datos
         if (a.p_aprobar) {
           if (s.tipo === 'familia') {
-            const emails = [s.email, d.email2].filter(Boolean)
+            const emails = [d.correo_padre, d.correo_madre].filter(Boolean)
             if (db.accesos_permitidos.some(x => emails.includes(x.email) && x.asociacion_id !== s.asociacion_id))
               return err('P0001', 'Un correo de la solicitud ya pertenece a otra asociación')
             db.familias.push({ id: uuid(), asociacion_id: s.asociacion_id, emails, nombre_padre: d.nombre_padre || null,
@@ -376,9 +374,6 @@ export function crearClienteDemo() {
               movil_padre: fam.movil_padre ?? null, movil_madre: fam.movil_madre ?? null, creado_en: hoyIso })
             db.periodos_alta.push({ id: uuid(), socio_id: id, fecha_alta: hoyIso, fecha_baja: null, motivo_baja: null })
             for (const e of fam.emails || [s.email]) db.familiares_socios.push({ email: e, socio_id: id })
-          } else {
-            const p = db.periodos_alta.find(x => x.socio_id === s.socio_id && !x.fecha_baja)
-            if (p) { p.fecha_baja = hoyIso < p.fecha_alta ? p.fecha_alta : hoyIso; p.motivo_baja = d.motivo || null }
           }
         }
         Object.assign(s, { estado: a.p_aprobar ? 'aprobada' : 'rechazada', motivo_resolucion: limpio(a.p_motivo, 300) || null,
