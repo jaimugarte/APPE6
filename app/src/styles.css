@@ -356,3 +356,12 @@ input.importe { width: 84px; min-height: 40px; text-align: right; }
 .cuota-grande b small { font-family: var(--sans); font-size: .875rem; font-weight: 400; color: var(--tinta-3); margin-left: 2px; }
 .tarjeta .resumen-tarjeta { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--linea); font-size: .8125rem; color: var(--tinta); }
 .tarjeta .resumen-tarjeta .badge { margin-left: 0; }
+
+/* ---------- Importar socios ---------- */
+.lista-errores { margin: 0 0 10px; padding-left: 18px; font-size: .875rem; color: var(--no); }
+.lista-errores.aviso { color: var(--tinta-2); }
+.lista-errores li { margin-bottom: 4px; }
+.item.duplicado select { min-width: 130px; }
+.check-fila { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 12px; font-size: .875rem; color: var(--tinta-2); }
+.check-fila input { margin-top: 4px; }
+.importar code { font-size: .8125rem; background: var(--acento-suave); padding: 1px 6px; border-radius: 6px; }

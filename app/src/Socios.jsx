@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { NIVELES, hoy, fecha, edad, normalizarIban, ibanValido, esEmail } from './util'
 import { eur, textoDescuento } from './cuotas'
+import ImportarSocios from './ImportarSocios'
 
 const VACIO = {
   nombre: '', apellidos: '', fecha_nacimiento: '', nivel: '',
@@ -60,6 +61,11 @@ export default function Socios({ asoc, rol, email }) {
 
   if (socios === null) return <main><p>Cargando socios…</p></main>
 
+  if (sel === 'importar') {
+    return <ImportarSocios asoc={asoc} esEncargado={esEncargado} existentes={socios}
+      nivelesPermitidos={restringido ? misNiveles : null} onVolver={() => setSel(null)} onCambio={cargar} />
+  }
+
   if (sel) {
     const socio = sel === 'nuevo' ? null : socios.find(s => s.id === sel)
     return (
@@ -76,7 +82,12 @@ export default function Socios({ asoc, rol, email }) {
     <main>
       <div className="barra">
         <h2>Socios <small>({activos} activos de {socios.length})</small></h2>
-        {puedeEditar && <button className="primario" onClick={() => setSel('nuevo')}>+ Nuevo socio</button>}
+        {puedeEditar && (
+          <span className="fila">
+            <button onClick={() => setSel('importar')}>Importar CSV</button>
+            <button className="primario" onClick={() => setSel('nuevo')}>+ Nuevo socio</button>
+          </span>
+        )}
       </div>
       {msg && <p className="error">{msg}</p>}
 

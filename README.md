@@ -77,3 +77,19 @@ App `actividades`: el encargado y los preceptores con permiso de **editar** publ
 ## Portal de la familia
 
 El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Actividades**.
+
+## Importar socios desde CSV
+
+En **Socios → Importar CSV** (encargado y preceptores con permiso de editar). Hay también el formulario individual («+ Nuevo socio»).
+
+1. Se descarga la plantilla (`plantilla-socios.csv`, solo cabecera, separador `;`). Columnas: `nombre, apellidos, fecha_nacimiento, nivel, fecha_alta, nombre_padre, correo_padre, movil_padre, nombre_madre, correo_madre, movil_madre, correo_socio, direccion, alergias`. El IBAN no se importa.
+2. Al subir el archivo se comprueba que están **todas** las columnas de la plantilla y ninguna más (el orden da igual; se acepta `;`, `,` o tabulador, y UTF-8).
+3. Reglas por fila (las filas con error no se importan y se listan con su número de fila):
+   - nombre y apellidos obligatorios; correos y móviles válidos; fechas reales (`AAAA-MM-DD` o `DD/MM/AAAA`), sin futuro; alta no anterior al nacimiento; textos con longitud máxima.
+   - nivel vacío → se calcula por la fecha de nacimiento; si no se puede, error. Un nivel fuera de la lista habitual solo da aviso. Un preceptor limitado a su nivel solo importa sus niveles.
+   - fecha de alta vacía → hoy. Máximo 500 filas y 1 MB.
+   - repetido dentro del archivo (mismo hijo y mismo correo de progenitor) → error en la segunda fila.
+4. **Duplicados**: mismo nombre del hijo (sin distinguir acentos ni mayúsculas; apellidos iguales o uno contenido en el otro) y algún correo de progenitor en común con un socio existente. Se muestran todos y, para cada uno (o en bloque), se elige **Sobrescribir** u **Omitir** (por defecto, omitir). Al sobrescribir solo se cambian las columnas con valor (una celda vacía nunca borra datos) y no se tocan las altas/bajas. Mismo nombre con otros correos se crea como nuevo, con aviso.
+5. El encargado puede marcar «Autorizar y vincular» para dar acceso a los correos de los progenitores (se omiten los ya autorizados con otro rol).
+
+Un preceptor solo detecta duplicados entre los socios que puede ver.
