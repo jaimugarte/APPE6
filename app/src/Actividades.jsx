@@ -89,7 +89,7 @@ export default function Actividades({ asoc, rol, email }) {
   return (
     <main className="actividades">
       <div className="barra">
-        <h2>Actividades</h2>
+        <h2>Planes</h2>
         {puedeCrear && <button className="primario" onClick={() => setEditando({ ...VACIO, fecha: sel || hoyIso, fecha_fin: sel || hoyIso })}>+ Nuevo plan</button>}
       </div>
       {msg && <p className="error">{msg}</p>}

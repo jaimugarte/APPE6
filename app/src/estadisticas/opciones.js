@@ -5,6 +5,7 @@
 export const C = {
   s1: '#2a78d6',        // categórico 1 (azul)
   s2: '#eb6834',        // categórico 2 (naranja)
+  rojo: '#d6342b',      // bajas
   texto: '#0b0b0b',
   texto2: '#52514e',
   mudo: '#898781',
@@ -54,50 +55,44 @@ const ejeY = (extra = {}) => ({
   ...extra
 })
 
-// Línea con área tenue: socios activos al final de cada mes
-export function opcionActivos(serie) {
-  return {
-    ...base(),
-    grid: { left: 8, right: 40, top: 16, bottom: 8, containLabel: true },
-    tooltip: tip('axis', ps => ps.length
-      ? `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}${ps[0].value} socios activos` : ''),
-    xAxis: ejeX(serie.map(s => s.etiqueta)),
-    yAxis: ejeY({ minInterval: 1 }),
-    series: [{
-      type: 'line', data: serie.map(s => s.activos),
-      showSymbol: false, symbol: 'circle', symbolSize: 8,
-      lineStyle: { width: 2, color: C.s1, cap: 'round', join: 'round' },
-      itemStyle: { color: C.s1, borderColor: C.sup, borderWidth: 2 },
-      areaStyle: { color: C.s1, opacity: 0.1 },
-      endLabel: { show: true, color: C.texto, fontWeight: 600, valueAnimation: false },
-      emphasis: { focus: 'series' }
-    }]
-  }
-}
-
-// Columnas agrupadas: altas (azul) y bajas (naranja) por mes
-export function opcionAltasBajas(serie) {
-  const mk = (name, key, color) => ({
-    name, type: 'bar', data: serie.map(s => s[key]), barMaxWidth: 24, barGap: '10%',
-    itemStyle: { color, borderRadius: [4, 4, 0, 0] }, emphasis: { focus: 'series' }
+// Evolución mensual: columnas de altas (azul) y bajas (rojo), y línea con área de socios activos a final de mes.
+// Las columnas usan su propio eje (derecha) porque son cifras mucho menores que el total de activos.
+export function opcionSociosMes(serie) {
+  const barra = (name, key, color) => ({
+    name, type: 'bar', yAxisIndex: 1, data: serie.map(s => s[key]), barMaxWidth: 16, barGap: '10%',
+    itemStyle: { color, borderRadius: [3, 3, 0, 0] }, emphasis: { focus: 'series' }, z: 3
   })
   return {
     ...base(),
-    grid: { left: 8, right: 16, top: 40, bottom: 8, containLabel: true },
+    grid: { left: 8, right: 8, top: 44, bottom: 8, containLabel: true },
     legend: {
-      top: 0, left: 0, data: ['Altas', 'Bajas'], icon: 'roundRect', itemWidth: 10, itemHeight: 10,
+      top: 0, left: 0, data: ['Altas', 'Bajas', 'Socios activos'], icon: 'roundRect', itemWidth: 10, itemHeight: 10,
       itemGap: 16, textStyle: { color: C.texto2, fontFamily: FUENTE }
     },
     tooltip: tip('axis', ps => ps.length
       ? `<b>${esc(ps[0].name)}</b>` + ps.map(p => `<br/>${punto(p.color)}${esc(p.seriesName)}: <b>${p.value}</b>`).join('') : '',
       'shadow'),
     xAxis: ejeX(serie.map(s => s.etiqueta)),
-    yAxis: ejeY({ minInterval: 1 }),
-    series: [mk('Altas', 'altas', C.s1), mk('Bajas', 'bajas', C.s2)]
+    yAxis: [
+      ejeY({ minInterval: 1, name: 'Activos', nameTextStyle: { color: C.mudo, align: 'left' } }),
+      ejeY({ minInterval: 1, splitLine: { show: false }, name: 'Altas / bajas', nameTextStyle: { color: C.mudo, align: 'right' } })
+    ],
+    series: [
+      {
+        name: 'Socios activos', type: 'line', yAxisIndex: 0, data: serie.map(s => s.activos), z: 1,
+        showSymbol: false, symbol: 'circle', symbolSize: 8,
+        lineStyle: { width: 2, color: C.texto2, cap: 'round', join: 'round' },
+        itemStyle: { color: C.texto2, borderColor: C.sup, borderWidth: 2 },
+        areaStyle: { color: C.texto2, opacity: 0.1 },
+        emphasis: { focus: 'series' }
+      },
+      barra('Altas', 'altas', C.s1),
+      barra('Bajas', 'bajas', C.rojo)
+    ]
   }
 }
 
-// Columnas de % de asistencia por periodo. Los periodos sin marcas quedan vacíos.
+// Columnas de asistentes por periodo (números absolutos). Los periodos sin socios quedan vacíos.
 export function opcionAsistencia(serie) {
   let ultimo = -1
   serie.forEach((s, i) => { if (s.pct != null) ultimo = i })
@@ -172,34 +167,21 @@ export function opcionNiveles(filas) {
   }
 }
 
-// Histograma de edades
-export function opcionEdades(filas) {
-  return {
-    ...base(),
-    grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
-    tooltip: tip('axis', ps => ps.length
-      ? `${punto(C.s1)}${esc(ps[0].name)} años: <b>${ps[0].value}</b> socios` : '', 'shadow'),
-    xAxis: ejeX(filas.map(f => String(f.edad)), { axisLabel: { color: C.mudo, interval: 0 } }),
-    yAxis: ejeY({ minInterval: 1 }),
-    series: [{
-      type: 'bar', data: filas.map(f => f.n), barMaxWidth: 24, barCategoryGap: '25%',
-      itemStyle: { color: C.s1, borderRadius: [4, 4, 0, 0] }
-    }]
-  }
-}
-
-// Mapa de calor: asistencia media (%) por nivel y actividad, rampa azul de un solo tono
+// Mapa de calor: asistentes por nivel y actividad (números absolutos), rampa azul de un solo tono
 export function opcionMapaCalor(m) {
+  const max = Math.max(1, ...m.celdas.map(c => c.valor))
+  const fmt = n => Number(n).toLocaleString('es-ES', { maximumFractionDigits: 1 })
   const data = m.celdas.map(c => ({
-    value: [c.x, c.y, c.pct], c,
+    value: [c.x, c.y, c.valor], c,
     // Texto blanco solo sobre los azules oscuros; sobre los medios y claros, tinta oscura
-    label: { color: c.pct >= 60 ? '#ffffff' : C.texto }
+    label: { color: c.valor >= max * 0.6 ? '#ffffff' : C.texto }
   }))
   return {
     ...base(),
     grid: { left: 8, right: 8, top: 8, bottom: 64, containLabel: true },
     tooltip: tip('item', p =>
-      `<b>${esc(m.nombres[p.value[0]])}</b>, ${esc(m.niveles[p.value[1]])}<br/>${punto(C.s1)}${p.value[2]}% (${p.data.c.si} de ${p.data.c.total})`),
+      `<b>${esc(m.nombres[p.value[0]])}</b>, ${esc(m.niveles[p.value[1]])}<br/>${punto(C.s1)}<b>${fmt(p.value[2])}</b> asistentes de media por periodo<br/>`
+      + `<span style="color:${C.mudo}">${p.data.c.total} asistencias en ${p.data.c.periodos} ${p.data.c.periodos === 1 ? 'periodo' : 'periodos'}</span>`),
     xAxis: {
       type: 'category', data: m.abrevs, axisLine: { show: false }, axisTick: { show: false },
       axisLabel: { color: C.texto2, interval: 0, fontSize: 11, fontWeight: 600 }
@@ -209,15 +191,37 @@ export function opcionMapaCalor(m) {
       axisLabel: { color: C.texto2 }
     },
     visualMap: {
-      min: 0, max: 100, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
-      itemWidth: 12, itemHeight: 160, text: ['100 %', '0 %'], inRange: { color: C.seq },
+      min: 0, max, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
+      itemWidth: 12, itemHeight: 160, text: [fmt(max), '0'], inRange: { color: C.seq },
       textStyle: { color: C.texto2, fontFamily: FUENTE }
     },
     series: [{
       type: 'heatmap', data,
-      label: { show: true, formatter: p => `${Math.round(p.value[2])}%`, fontSize: 11 },
+      label: { show: true, formatter: p => fmt(p.value[2]), fontSize: 11 },
       itemStyle: { borderColor: C.sup, borderWidth: 2, borderRadius: 4 },
       emphasis: { itemStyle: { borderColor: C.texto2 } }
     }]
+  }
+}
+
+// Asistentes por periodo, una columna de color por nivel. colorDe(nivel) da el color de cada uno.
+export function opcionAsistenciaPorNivel(serie, niveles, colorDe) {
+  return {
+    ...base(),
+    grid: { left: 8, right: 16, top: niveles.length > 5 ? 64 : 44, bottom: 8, containLabel: true },
+    legend: {
+      top: 0, left: 0, data: niveles, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 12,
+      textStyle: { color: C.texto2, fontFamily: FUENTE }
+    },
+    tooltip: tip('axis', ps => ps.length
+      ? `<b>${esc(ps[0].name)}</b>` + ps.map(p => `<br/>${punto(p.color)}${esc(p.seriesName)}: <b>${p.value}</b> de ${p.data.total}`).join('') : '',
+      'shadow'),
+    xAxis: ejeX(serie.filas.map(f => f.etiqueta)),
+    yAxis: ejeY({ min: 0, minInterval: 1 }),
+    series: niveles.map(n => ({
+      name: n, type: 'bar', barMaxWidth: 14, barGap: '8%',
+      data: serie.filas.map(f => ({ value: f.si[n] || 0, total: f.total[n] || 0 })),
+      itemStyle: { color: colorDe(n), borderRadius: [3, 3, 0, 0] }, emphasis: { focus: 'series' }
+    }))
   }
 }

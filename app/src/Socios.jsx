@@ -9,6 +9,8 @@ const VACIO = {
   nombre_padre: '', nombre_madre: '', alergias: '', direccion: '',
   correo_padre: '', correo_madre: '', correo_socio: '', movil_padre: '', movil_madre: ''
 }
+// Círculos y catequesis solo se preguntan desde 2º ESO (Universidad incluida)
+const desde2ESO = nivel => NIVELES.indexOf(nivel) >= NIVELES.indexOf('2º ESO')
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
 
 export default function Socios({ asoc, rol, email }) {
@@ -135,12 +137,19 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
     : { ...VACIO, nivel: restringido ? (nivelesOpc[0] || '') : '' })
   const [altaInicial, setAltaInicial] = useState(hoy())
   const [iban, setIban] = useState('')
+  const [eq, setEq] = useState({ asiste_circulos: false, es_catequista: false }) // por defecto «No»
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [versionCuota, setVersionCuota] = useState(0)
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const ro = !puedeEditar
+
+  useEffect(() => {
+    if (socio)
+      supabase.from('socios_equipo').select('asiste_circulos, es_catequista').eq('socio_id', socio.id).maybeSingle()
+        .then(({ data }) => { if (data) setEq(data) })
+  }, [socio?.id])
 
   useEffect(() => {
     if (esEncargado && socio)
@@ -169,6 +178,10 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
       const { data, error } = await supabase.from('socios').update(datos).eq('id', id).select('id')
       if (error) { setGuardando(false); return setMsg(error.message) }
       if (!data?.length) { setGuardando(false); return setMsg('No tienes permiso para editar este socio.') }
+    }
+    if (desde2ESO(datos.nivel)) {
+      const { error } = await supabase.from('socios_equipo').upsert({ socio_id: id, ...eq })
+      if (error) { setGuardando(false); await onCambio(); return setMsg('Datos guardados, pero no «círculos / catequista»: ' + error.message) }
     }
     if (esEncargado) {
       const v = normalizarIban(iban)
@@ -220,6 +233,18 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
           </Campo>
         </div>
       </section>
+
+      {desde2ESO(f.nivel) && (
+        <section>
+          <h2>Equipo <small>(solo visible para preceptores y encargado)</small></h2>
+          <div className="formgrid">
+            <label className="check-fila"><input type="checkbox" checked={eq.asiste_circulos} disabled={ro}
+              onChange={e => setEq({ ...eq, asiste_circulos: e.target.checked })} /><span>Asiste a círculos</span></label>
+            <label className="check-fila"><input type="checkbox" checked={eq.es_catequista} disabled={ro}
+              onChange={e => setEq({ ...eq, es_catequista: e.target.checked })} /><span>Es catequista</span></label>
+          </div>
+        </section>
+      )}
 
       <section>
         <h2>Familia y contacto</h2>

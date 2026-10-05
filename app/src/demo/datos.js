@@ -1,6 +1,6 @@
 // Base de datos de ejemplo para el modo demo. Se genera de forma determinista (mismo resultado cada vez)
 // pero con fechas relativas a hoy, para que los gráficos siempre tengan datos recientes.
-import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo } from '../util.js'
+import { hoy, inicioPeriodo, sumarPeriodos, finPeriodo, NIVELES as NIVELES_ORDEN } from '../util.js'
 
 // Generador pseudoaleatorio con semilla (mulberry32)
 function azar(semilla) {
@@ -37,7 +37,8 @@ const TIPOS = [
   ['t-charla', 'Charla', 'CHAR', 'semanal', 0.82], ['t-circulo', 'Círculo', 'CIRC', 'semanal', 0.78],
   ['t-visita', 'Visita de pobres', 'VIPO', 'mensual', 0.55], ['t-retiro', 'Retiro mensual', 'RTME', 'mensual', 0.62],
   ['t-curso', 'Curso de retiro', 'CRT', 'anual', 0.7], ['t-precept', 'Preceptuación', 'PREC', 'semanal', 0.86],
-  ['t-sacerdote', 'Sacerdote', 'SACD', 'semanal', 0.72]
+  ['t-sacerdote', 'Sacerdote', 'SACD', 'semanal', 0.72],
+  ['t-padres', 'Conversación con los padres', 'PADR', 'trimestral', 0.45]
 ]
 
 export const USUARIOS_DEMO = {
@@ -66,7 +67,7 @@ export function crearBD() {
       { clave: 'socios', nombre: 'Socios', descripcion: 'Base de datos de socios, altas y bajas' },
       { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a actividades' },
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
-      { clave: 'actividades', nombre: 'Actividades', descripcion: 'Planes y actividades de la asociación' },
+      { clave: 'actividades', nombre: 'Planes', descripcion: 'Calendario de planes de la asociación' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -102,7 +103,7 @@ export function crearBD() {
     tipos_actividad: TIPOS.map(([id, nombre, abreviatura, periodicidad], i) => ({
       id, asociacion_id: ASOC, nombre, abreviatura, periodicidad, activa: true, orden: i + 1
     })),
-    socios: [], periodos_alta: [], socios_bancarios: [], familiares_socios: [], registros_asistencia: [],
+    socios: [], periodos_alta: [], socios_bancarios: [], socios_equipo: [], familiares_socios: [], registros_asistencia: [],
     // Solicitudes de alta: enlace de invitación, familias aprobadas y solicitudes de ejemplo
     enlaces_alta: [{ id: 'e-1', asociacion_id: ASOC, token: 'demo-invitacion', activo: true, caduca_en: null, creado_en: H }],
     familias: [{ id: 'f-1', asociacion_id: ASOC, emails: ['familia@demo.es'], nombre_padre: 'Antonio Demo', nombre_madre: 'María Prueba',
@@ -182,6 +183,12 @@ export function crearBD() {
       db.periodos_alta.push(...periodos)
     }
   }
+  // «Asiste a círculos» y «Es catequista»: solo a partir de 2º ESO (el resto, sin fila = «No»)
+  db.socios.forEach((s, i) => {
+    const k = NIVELES_ORDEN.indexOf(s.nivel)
+    if (k >= NIVELES_ORDEN.indexOf('2º ESO'))
+      db.socios_equipo.push({ socio_id: s.id, asiste_circulos: i % 3 === 0, es_catequista: i % 7 === 0 && k >= NIVELES_ORDEN.indexOf('3º ESO') })
+  })
   db.socios_bancarios.push({ socio_id: 's-1', iban: 'ES9121000418450200051332' })
 
   // Dos hermanos vinculados a la cuenta de familia de ejemplo

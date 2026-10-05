@@ -3,7 +3,7 @@
 // Modelo de asistencia: en cada periodo, cada socio figura como «No» hasta que se marca «Sí».
 // Solo se guardan las asistencias. El porcentaje es asistentes / socios del periodo, donde los socios
 // del periodo son los que estaban de alta en algún momento del mismo (más los que ya tengan asistencia).
-import { NIVELES, edad, inicioPeriodo, sumarPeriodos, finPeriodo, abrev } from '../util.js'
+import { NIVELES, inicioPeriodo, sumarPeriodos, finPeriodo, abrev } from '../util.js'
 
 const p2 = n => String(n).padStart(2, '0')
 
@@ -81,23 +81,6 @@ export function porNivel(socios, hastaIso) {
     cuenta.set(n, (cuenta.get(n) || 0) + 1)
   }
   return [...cuenta].map(([nivel, n]) => ({ nivel, n })).sort((a, b) => ordenNivel(a.nivel, b.nivel))
-}
-
-// Histograma de edades de los socios activos (una columna por año, sin huecos)
-export function porEdad(socios, hastaIso) {
-  const cuenta = new Map()
-  let sinFecha = 0
-  for (const s of socios) {
-    if (!estabaActivo(s, hastaIso)) continue
-    const e = edad(s.fecha_nacimiento)
-    if (e == null) { sinFecha++; continue }
-    cuenta.set(e, (cuenta.get(e) || 0) + 1)
-  }
-  if (!cuenta.size) return { filas: [], sinFecha }
-  const edades = [...cuenta.keys()]
-  const filas = []
-  for (let e = Math.min(...edades); e <= Math.max(...edades); e++) filas.push({ edad: e, n: cuenta.get(e) || 0 })
-  return { filas, sinFecha }
 }
 
 // Cuántos periodos de cada actividad cubre un rango de meses (solo para decidir cuántos datos pedir)
@@ -190,34 +173,55 @@ export function serieAsistenciaMensual(registros, socios, tipo, desdeIso, hastaI
   })
 }
 
-// Asistencia media (%) por nivel y actividad en un rango de fechas
-export function matrizNivelActividad(registros, socios, tipos, desdeIso, hastaIso) {
+// Grupos de niveles para el mapa de asistencia
+export const GRUPOS = {
+  club: { nombre: 'Club', niveles: ['5º primaria', '6º primaria', '1º ESO', '2º ESO'] },
+  sanrafael: { nombre: 'San Rafael', niveles: ['3º ESO', '4º ESO', '1º Bachillerato', '2º Bachillerato'] }
+}
+
+// Asistencia por nivel y actividad en números absolutos, solo para los niveles indicados.
+// valor = media de asistentes por periodo (semana, mes…); total = asistencias sumadas en el rango.
+// Un periodo cuenta para un nivel si ese nivel tenía algún socio en él.
+export function matrizNivelActividad(registros, socios, tipos, desdeIso, hastaIso, niveles) {
   const nivelDe = new Map(socios.map(s => [s.id, s.nivel || 'Sin nivel']))
-  const acc = new Map() // `${tipoId}|${nivel}` -> {si, total}
+  const acc = new Map() // `${tipoId}|${nivel}` -> {si, periodos}
   recorrer(registros, socios, tipos, desdeIso, hastaIso, (t, _ini, part) => {
+    const aqui = new Map()
     for (const [id, asistio] of part) {
-      const k = `${t.id}|${nivelDe.get(id)}`
-      const c = acc.get(k) || { si: 0, total: 0 }
-      c.total++; if (asistio) c.si++
+      const nv = nivelDe.get(id)
+      if (!niveles.includes(nv)) continue
+      aqui.set(nv, (aqui.get(nv) || 0) + (asistio ? 1 : 0))
+    }
+    for (const [nv, si] of aqui) {
+      const k = `${t.id}|${nv}`
+      const c = acc.get(k) || { si: 0, periodos: 0 }
+      c.si += si; c.periodos++
       acc.set(k, c)
     }
   })
-  const niveles = [...new Set([...acc.keys()].map(k => k.split('|').slice(1).join('|')))].sort(ordenNivel)
   const usados = tipos.filter(t => niveles.some(n => acc.has(`${t.id}|${n}`)))
+  const filas = niveles.filter(n => usados.some(t => acc.has(`${t.id}|${n}`)))
   const celdas = []
-  usados.forEach((t, x) => niveles.forEach((nv, y) => {
+  usados.forEach((t, x) => filas.forEach((nv, y) => {
     const c = acc.get(`${t.id}|${nv}`)
-    if (c) celdas.push({ x, y, pct: Math.round((1000 * c.si) / c.total) / 10, si: c.si, total: c.total })
+    if (c) celdas.push({ x, y, valor: Math.round((10 * c.si) / c.periodos) / 10, total: c.si, periodos: c.periodos })
   }))
-  return { abrevs: usados.map(abrev), nombres: usados.map(t => t.nombre), niveles, celdas }
+  return { abrevs: usados.map(abrev), nombres: usados.map(t => t.nombre), niveles: filas, celdas }
 }
 
-// Asistencia media global (%) en un rango de fechas
-export function asistenciaMedia(registros, socios, tipos, desdeIso, hastaIso) {
-  let si = 0, total = 0
-  recorrer(registros, socios, tipos, desdeIso, hastaIso, (_t, _ini, part) => {
-    total += part.size
-    for (const v of part.values()) if (v) si++
+// Asistentes de una actividad por periodo y por nivel (números absolutos)
+export function serieAsistenciaPorNivel(registros, socios, tipo, desdeIso, hastaIso) {
+  const nivelDe = new Map(socios.map(s => [s.id, s.nivel || 'Sin nivel']))
+  const usados = new Set(), filas = []
+  recorrer(registros, socios, [tipo], desdeIso, hastaIso, (t, inicio, part) => {
+    const si = {}, total = {}
+    for (const [id, asistio] of part) {
+      const nv = nivelDe.get(id)
+      total[nv] = (total[nv] || 0) + 1
+      si[nv] = (si[nv] || 0) + (asistio ? 1 : 0)
+      usados.add(nv)
+    }
+    filas.push({ inicio, etiqueta: etiquetaCorta(inicio, t.periodicidad), si, total })
   })
-  return total ? Math.round((1000 * si) / total) / 10 : null
+  return { niveles: [...usados].sort(ordenNivel), filas }
 }

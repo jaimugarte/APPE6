@@ -64,19 +64,19 @@ Las familias no ven Socios ni Solicitudes: su inicio muestra el resumen (hijos d
 
 Cuota: en Ajustes el encargado define el importe mensual por orden de hermano (por defecto 35 € el hijo de alta más antiguo, 10 € el segundo y 0 € el resto; el último tramo vale para los siguientes). Los descuentos son por familia (en % o en €/mes) y los pone el encargado, o los preceptores si el encargado lo permite, desde la ficha del socio. Las familias no pueden pedirlos desde la app.
 
-## Actividades (planes)
+## Planes
 
-App `actividades`: el encargado y los preceptores con permiso de **editar** publican planes (título, fecha o varios días, horas, lugar, **precio** y **descripción**) dirigidos a todos los niveles o a algunos. Se ven por **semana** (por defecto) o por **mes**.
+App `actividades` (se muestra como «Planes»): el encargado y los preceptores con permiso de **editar** publican planes (título, fecha o varios días, horas, lugar, **precio** y **descripción**) dirigidos a todos los niveles o a algunos. Se ven por **semana** (por defecto) o por **mes**.
 
 - Las familias ven los planes de los niveles de sus hijos de alta, y los dirigidos a todos.
 - Un preceptor con ámbito «Solo su nivel» solo crea o edita planes de sus propios niveles (no para todos los niveles); con «Todos los niveles», cualquiera.
 - El precio es informativo: no se suma a las cuotas.
-- El administrador global debe conceder la app «Actividades» a la asociación y el encargado activarla; luego, en Ajustes → Permisos, decide qué puede hacer cada preceptor.
-- Tras actualizar el código, vuelve a ejecutar `supabase/schema.sql` (nueva tabla `planes` y nueva app).
+- El administrador global debe conceder la app «Planes» a la asociación y el encargado activarla; luego, en Ajustes → Permisos, decide qué puede hacer cada preceptor.
+- Un proyecto nuevo solo necesita `supabase/schema.sql`. Si ya lo tenías creado, ejecuta además `supabase/actualizaciones.sql` (no repitas `schema.sql`).
 
 ## Portal de la familia
 
-El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Actividades**.
+El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Planes**.
 
 ## Importar socios desde CSV
 
@@ -93,3 +93,14 @@ En **Socios → Importar CSV** (encargado y preceptores con permiso de editar). 
 5. El encargado puede marcar «Autorizar y vincular» para dar acceso a los correos de los progenitores (se omiten los ya autorizados con otro rol).
 
 Un preceptor solo detecta duplicados entre los socios que puede ver.
+
+## Estadísticas (resumen actual)
+
+- **Socios activos**: columnas de altas (azul) y bajas (rojo) por mes y línea con área de socios activos a final de mes (eje propio a la izquierda; columnas en el eje derecho). Debajo, **Socios por nivel**.
+- **Asistencia semanal**: asistentes en números absolutos por periodo de la actividad elegida; debajo, «Total / Por cursos» con selección de los cursos a mostrar (un color por curso).
+- **Asistencia mensual**: «Distintos» (socios distintos en el mes) o «Media/sem.» (solo actividades semanales).
+- **Asistencia por nivel y actividad**: asistentes de media por periodo, en dos grupos: **Club** (5º primaria – 2º ESO) y **San Rafael** (3º ESO – 2º Bachillerato). Los demás niveles no aparecen en este mapa.
+
+## Datos de equipo del socio
+
+Desde 2º ESO la ficha muestra «Asiste a círculos» y «Es catequista» (por defecto «No»). Se guardan en una tabla aparte (`socios_equipo`) que solo ven el encargado y los preceptores con permiso sobre ese socio; las familias nunca. Hay una nueva actividad de asistencia «Conversación con los padres» (PADR, trimestral por defecto; el encargado puede cambiarla en Ajustes).

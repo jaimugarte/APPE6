@@ -10,7 +10,7 @@ const PK = {
   perfiles: ['id'], asociaciones: ['id'], apps: ['clave'], asociacion_apps: ['asociacion_id', 'app_clave'],
   accesos_permitidos: ['email'], membresias: ['user_id'], permisos_preceptor: ['asociacion_id', 'app_clave'],
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
-  socios_bancarios: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
+  socios_bancarios: ['socio_id'], socios_equipo: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
   enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id']
 }
@@ -24,7 +24,7 @@ const REL = {
 const TIPOS_POR_DEFECTO = [
   ['Charla', 'CHAR', 'semanal'], ['Círculo', 'CIRC', 'semanal'], ['Visita de pobres', 'VIPO', 'mensual'],
   ['Retiro mensual', 'RTME', 'mensual'], ['Curso de retiro', 'CRT', 'anual'],
-  ['Preceptuación', 'PREC', 'semanal'], ['Sacerdote', 'SACD', 'semanal']
+  ['Preceptuación', 'PREC', 'semanal'], ['Sacerdote', 'SACD', 'semanal'], ['Conversación con los padres', 'PADR', 'trimestral']
 ]
 
 const uuid = () => (globalThis.crypto?.randomUUID?.() ?? 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36))
@@ -141,6 +141,7 @@ export function crearClienteDemo() {
       case 'socios_bancarios': return u.rol === 'encargado' && socioDe(r.socio_id)?.asociacion_id === u.asoc
       case 'familiares_socios': return r.email === u.email || puedeSocio(u, socioDe(r.socio_id), 'socios', 'ver')
       case 'registros_asistencia': return puedeSocio(u, socioDe(r.socio_id), 'asistencia', 'ver')
+      case 'socios_equipo': return puedeSocio(u, socioDe(r.socio_id), 'socios', 'ver')
       case 'global_admins': return u.admin
       case 'enlaces_alta': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'familias': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.emails.includes(u.email))
@@ -160,6 +161,7 @@ export function crearClienteDemo() {
       case 'periodos_alta': case 'familiares_socios': return puedeSocio(u, socioDe(r.socio_id), 'socios', 'editar')
       case 'registros_asistencia': return puedeSocio(u, socioDe(r.socio_id), 'asistencia', 'editar')
       case 'socios_bancarios': return u.rol === 'encargado' && socioDe(r.socio_id)?.asociacion_id === u.asoc
+      case 'socios_equipo': return puedeSocio(u, socioDe(r.socio_id), 'socios', 'editar')
       case 'asociaciones': case 'asociacion_apps': case 'apps': case 'global_admins': return u.admin
       case 'accesos_permitidos': return u.admin || (u.rol === 'encargado' && r.asociacion_id === u.asoc && r.rol !== 'encargado')
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
@@ -181,6 +183,7 @@ export function crearClienteDemo() {
     if (tabla === 'permisos_preceptor') { f.puede_ver ??= false; f.puede_editar ??= false; f.ambito ??= 'su_nivel' }
     if (tabla === 'asociacion_apps') { f.permitida ??= false; f.activa ??= false }
     if (tabla === 'periodos_alta') { f.fecha_baja ??= null; f.motivo_baja ??= null }
+    if (tabla === 'socios_equipo') { f.asiste_circulos ??= false; f.es_catequista ??= false }
     if (tabla === 'planes') { f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
     if (tabla === 'enlaces_alta') { f.token ??= (uuid() + uuid()).replaceAll('-', ''); f.activo ??= true; f.caduca_en ??= null; f.creado_en ??= hoyIso }

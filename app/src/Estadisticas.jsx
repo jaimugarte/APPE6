@@ -4,6 +4,7 @@ import { hoy, abrev } from './util'
 import Grafico from './estadisticas/Grafico'
 import * as calc from './estadisticas/calculos'
 import * as op from './estadisticas/opciones'
+import { colorNivel } from './coloresNivel'
 
 // PostgREST devuelve como mucho 1000 filas por petición: se pide por páginas
 async function paginar(construir) {
@@ -24,6 +25,9 @@ export default function Estadisticas({ asoc, rol }) {
   const [error, setError] = useState('')
   const [tipoId, setTipoId] = useState(null)
   const [modoMensual, setModoMensual] = useState('distintos') // 'distintos' | 'media'
+  const [vistaSemanal, setVistaSemanal] = useState('total') // 'total' | 'cursos'
+  const [nivelesSel, setNivelesSel] = useState(null) // null = todos los cursos
+  const [grupo, setGrupo] = useState('club') // mapa por nivel: 'club' | 'sanrafael'
   const H = useMemo(() => hoy(), [])
 
   // Un preceptor necesita permiso de «ver» sobre Estadísticas; las familias no tienen acceso
@@ -60,41 +64,41 @@ export default function Estadisticas({ asoc, rol }) {
 
   const desdeRango = rango === 'curso' ? calc.inicioCurso(H) : `${calc.ultimosMeses(H, rango)[0]}-01`
   const meses = rango === 'curso' ? calc.mesesDesde(desdeRango, H) : rango
-  const corto = rango === 'curso' ? 'curso' : `${rango} meses`
   const tipo = datos?.tipos.find(t => t.id === tipoId)
 
   const serie = useMemo(() => datos && calc.serieSocios(datos.socios, H, meses), [datos, meses, H])
   const niveles = useMemo(() => datos && calc.porNivel(datos.socios, H), [datos, H])
-  const edades = useMemo(() => datos && calc.porEdad(datos.socios, H), [datos, H])
   const asis = useMemo(() => datos && tipo
     ? calc.serieAsistencia(datos.registros, datos.socios, tipo, desdeRango, H) : null,
     [datos, tipo, desdeRango, H])
   const asisMes = useMemo(() => datos && tipo
     ? calc.serieAsistenciaMensual(datos.registros, datos.socios, tipo, desdeRango, H) : null,
     [datos, tipo, desdeRango, H])
-  const mapa = useMemo(() => datos && calc.matrizNivelActividad(datos.registros, datos.socios, datos.tipos, desdeRango, H),
-    [datos, desdeRango, H])
-  const media = useMemo(() => datos && calc.asistenciaMedia(datos.registros, datos.socios, datos.tipos, desdeRango, H),
-    [datos, desdeRango, H])
+  const asisNivel = useMemo(() => datos && tipo
+    ? calc.serieAsistenciaPorNivel(datos.registros, datos.socios, tipo, desdeRango, H) : null,
+    [datos, tipo, desdeRango, H])
+  const mapa = useMemo(() => datos && calc.matrizNivelActividad(datos.registros, datos.socios, datos.tipos, desdeRango, H, calc.GRUPOS[grupo].niveles),
+    [datos, desdeRango, H, grupo])
 
   // Opciones de los gráficos: todos los hooks van antes de cualquier return anticipado
-  const oActivos = useMemo(() => serie && op.opcionActivos(serie), [serie])
-  const oAltas = useMemo(() => serie && op.opcionAltasBajas(serie), [serie])
+  const oSocios = useMemo(() => serie && op.opcionSociosMes(serie), [serie])
+  const cursosMostrados = asisNivel ? asisNivel.niveles.filter(n => !nivelesSel || nivelesSel.includes(n)) : []
+  const oAsisNivel = useMemo(() => (asisNivel && cursosMostrados.length
+    ? op.opcionAsistenciaPorNivel(asisNivel, cursosMostrados, colorNivel) : null),
+  [asisNivel, nivelesSel]) // eslint-disable-line react-hooks/exhaustive-deps
   const oAsis = useMemo(() => asis && op.opcionAsistencia(asis), [asis])
   const modoEf = modoMensual === 'media' && tipo?.periodicidad !== 'semanal' ? 'distintos' : modoMensual
   const oAsisMes = useMemo(() => asisMes && op.opcionAsistenciaMensual(asisMes, modoEf), [asisMes, modoEf])
   const oMapa = useMemo(() => (mapa?.celdas.length ? op.opcionMapaCalor(mapa) : null), [mapa])
   const oNiveles = useMemo(() => (niveles?.length ? op.opcionNiveles(niveles) : null), [niveles])
-  const oEdades = useMemo(() => (edades?.filas.length ? op.opcionEdades(edades.filas) : null), [edades])
 
   if (permiso === null) return <main><p>Cargando…</p></main>
   if (!permiso) return <main><p className="aviso">No tienes acceso a las estadísticas. Pídeselo al encargado de tu asociación.</p></main>
   if (error) return <main><p className="error">{error}</p></main>
   if (!datos) return <main><p>Cargando estadísticas…</p></main>
 
-  const activos = serie.at(-1)?.activos ?? 0
-  const altas = serie.reduce((a, s) => a + s.altas, 0)
-  const bajas = serie.reduce((a, s) => a + s.bajas, 0)
+  const alternarCurso = n => setNivelesSel(
+    (nivelesSel || asisNivel.niveles).includes(n) ? (nivelesSel || asisNivel.niveles).filter(x => x !== n) : [...(nivelesSel || asisNivel.niveles), n])
 
   return (
     <main>
@@ -110,21 +114,17 @@ export default function Estadisticas({ asoc, rol }) {
         </label>
       </div>
 
-      <div className="kpis">
-        <div className="kpi"><span>Socios activos</span><b>{activos}</b></div>
-        <div className="kpi"><span>Altas ({corto})</span><b>{altas}</b></div>
-        <div className="kpi"><span>Bajas ({corto})</span><b>{bajas}</b></div>
-        <div className="kpi"><span>Asistencia media</span><b>{media == null ? '—' : `${media}%`}</b></div>
-      </div>
-
-      <Tarjeta titulo="Socios activos" subtitulo="Al final de cada mes"
-        tabla={{ cab: ['Mes', 'Activos'], filas: serie.map(s => [s.etiqueta, s.activos]) }}>
-        <Grafico option={oActivos} etiqueta="Evolución mensual de socios activos" />
+      <Tarjeta titulo="Socios activos" subtitulo="Altas y bajas de cada mes (columnas) y socios activos a final de mes (línea). Las altas incluyen las reincorporaciones"
+        tabla={{ cab: ['Mes', 'Altas', 'Bajas', 'Activos'], filas: serie.map(s => [s.etiqueta, s.altas, s.bajas, s.activos]) }}>
+        <Grafico option={oSocios} alto={300} etiqueta="Altas, bajas y socios activos por mes" />
       </Tarjeta>
 
-      <Tarjeta titulo="Altas y bajas" subtitulo="Por mes. Las altas incluyen las reincorporaciones"
-        tabla={{ cab: ['Mes', 'Altas', 'Bajas'], filas: serie.map(s => [s.etiqueta, s.altas, s.bajas]) }}>
-        <Grafico option={oAltas} etiqueta="Altas y bajas por mes" />
+      <Tarjeta titulo="Socios por nivel" subtitulo="Socios activos hoy"
+        tabla={{ cab: ['Nivel', 'Socios'], filas: niveles.map(n => [n.nivel, n.n]) }}>
+        {oNiveles
+          ? <Grafico option={oNiveles} alto={niveles.length * 32 + 24}
+              etiqueta="Socios activos por nivel" />
+          : <p className="aviso">No hay socios activos.</p>}
       </Tarjeta>
 
       <Tarjeta titulo="Asistencia semanal"
@@ -139,11 +139,37 @@ export default function Estadisticas({ asoc, rol }) {
             ))}
           </div>
         )}
-        tabla={asis && { cab: ['Periodo', 'Asistieron', 'Socios', '%'],
-          filas: asis.map(s => [s.etiqueta, s.si, s.total, s.pct == null ? '—' : `${s.pct}%`]) }}>
-        {asis
-          ? <Grafico option={oAsis} etiqueta={`Asistencia a ${tipo.nombre}`} />
-          : <p className="aviso">No hay actividades activas.</p>}
+        tabla={vistaSemanal === 'cursos' && asisNivel
+          ? { cab: ['Periodo', ...cursosMostrados], filas: asisNivel.filas.map(f => [f.etiqueta, ...cursosMostrados.map(n => f.si[n] || 0)]) }
+          : asis && { cab: ['Periodo', 'Asistieron', 'Socios', '%'],
+            filas: asis.map(s => [s.etiqueta, s.si, s.total, s.pct == null ? '—' : `${s.pct}%`]) }}
+        pie={asis && (
+          <div className="pie-grafico">
+            <div className="seg" role="group" aria-label="Cómo mostrar">
+              <button className={vistaSemanal === 'total' ? 'on' : ''} aria-pressed={vistaSemanal === 'total'} onClick={() => setVistaSemanal('total')}>Total</button>
+              <button className={vistaSemanal === 'cursos' ? 'on' : ''} aria-pressed={vistaSemanal === 'cursos'} onClick={() => setVistaSemanal('cursos')}>Por cursos</button>
+            </div>
+            {vistaSemanal === 'cursos' && asisNivel && (
+              <div className="filtro-nivel" role="group" aria-label="Cursos a mostrar">
+                {asisNivel.niveles.map(n => {
+                  const on = cursosMostrados.includes(n)
+                  return (
+                    <button key={n} className={'fn' + (on ? ' on' : '')} aria-pressed={on} style={{ '--c': colorNivel(n) }}
+                      onClick={() => alternarCurso(n)}><i />{n}</button>
+                  )
+                })}
+                <button className="mini" onClick={() => setNivelesSel(null)}>Todos</button>
+              </div>
+            )}
+          </div>
+        )}>
+        {!asis
+          ? <p className="aviso">No hay actividades activas.</p>
+          : vistaSemanal === 'cursos'
+            ? (oAsisNivel
+              ? <Grafico option={oAsisNivel} alto={300} etiqueta={`Asistencia a ${tipo.nombre} por cursos`} />
+              : <p className="aviso">Elige al menos un curso.</p>)
+            : <Grafico option={oAsis} etiqueta={`Asistencia a ${tipo.nombre}`} />}
       </Tarjeta>
 
       <Tarjeta titulo="Asistencia mensual"
@@ -165,38 +191,31 @@ export default function Estadisticas({ asoc, rol }) {
           : <p className="aviso">No hay actividades activas.</p>}
       </Tarjeta>
 
-      <Tarjeta titulo="Asistencia por nivel y actividad" subtitulo="Media del periodo seleccionado"
+      <Tarjeta titulo="Asistencia por nivel y actividad" subtitulo="Asistentes de media por periodo (semana, mes…) en el rango seleccionado"
+        extra={(
+          <div className="seg" role="group" aria-label="Grupo de niveles">
+            {Object.entries(calc.GRUPOS).map(([k, g]) => (
+              <button key={k} className={grupo === k ? 'on' : ''} aria-pressed={grupo === k}
+                title={`${g.niveles[0]} a ${g.niveles.at(-1)}`} onClick={() => setGrupo(k)}>{g.nombre}</button>
+            ))}
+          </div>
+        )}
         tabla={mapa.celdas.length ? { cab: ['Nivel', ...mapa.abrevs],
           filas: mapa.niveles.map((nv, y) => [nv, ...mapa.abrevs.map((_, x) => {
             const c = mapa.celdas.find(k => k.x === x && k.y === y)
-            return c ? `${c.pct}%` : '—'
+            return c ? c.valor : '—'
           })]) } : null}>
         {oMapa
           ? <Grafico option={oMapa} alto={mapa.niveles.length * 34 + 110}
-              etiqueta="Asistencia media por nivel y actividad" />
-          : <p className="aviso">Todavía no hay datos de asistencia en este periodo.</p>}
-      </Tarjeta>
-
-      <Tarjeta titulo="Socios por nivel" subtitulo="Socios activos hoy"
-        tabla={{ cab: ['Nivel', 'Socios'], filas: niveles.map(n => [n.nivel, n.n]) }}>
-        {oNiveles
-          ? <Grafico option={oNiveles} alto={niveles.length * 32 + 24}
-              etiqueta="Socios activos por nivel" />
-          : <p className="aviso">No hay socios activos.</p>}
-      </Tarjeta>
-
-      <Tarjeta titulo="Edades" subtitulo={`Socios activos hoy, en años${edades.sinFecha ? `. ${edades.sinFecha} sin fecha de nacimiento` : ''}`}
-        tabla={{ cab: ['Edad', 'Socios'], filas: edades.filas.map(e => [e.edad, e.n]) }}>
-        {oEdades
-          ? <Grafico option={oEdades} etiqueta="Distribución de edades" />
-          : <p className="aviso">Ningún socio activo tiene fecha de nacimiento.</p>}
+              etiqueta={`Asistentes de media por nivel y actividad, ${calc.GRUPOS[grupo].nombre}`} />
+          : <p className="aviso">Todavía no hay datos de asistencia de {calc.GRUPOS[grupo].nombre} en este periodo.</p>}
       </Tarjeta>
     </main>
   )
 }
 
 // Tarjeta de gráfico con vista alternativa en tabla (el mismo dato, accesible sin depender del color)
-function Tarjeta({ titulo, subtitulo, extra, tabla, children }) {
+function Tarjeta({ titulo, subtitulo, extra, pie, tabla, children }) {
   const [verTabla, setVerTabla] = useState(false)
   return (
     <section className="grafico">
@@ -216,6 +235,7 @@ function Tarjeta({ titulo, subtitulo, extra, tabla, children }) {
           </table>
         </div>
       ) : children}
+      {pie}
     </section>
   )
 }

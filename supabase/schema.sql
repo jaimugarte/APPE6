@@ -38,7 +38,7 @@ insert into apps(clave, nombre, descripcion) values
   ('socios',       'Socios',       'Base de datos de socios, altas y bajas'),
   ('asistencia',   'Asistencia',   'Registro de asistencia a actividades'),
   ('estadisticas', 'Estadísticas', 'Gráficos y paneles'),
-  ('actividades',  'Actividades',  'Planes y actividades de la asociación'),
+  ('actividades',  'Planes',       'Calendario de planes de la asociación'),
   ('anuncios',     'Anuncios',     'Avisos y comunicados (futuro)'),
   ('fotos',        'Fotos',        'Galería de actividades (futuro)');
 
@@ -126,6 +126,13 @@ create table socios_bancarios (
   iban text not null
 );
 
+-- Datos solo para el equipo (la familia no los ve): se usan a partir de 2º ESO. Sin fila = «No».
+create table socios_equipo (
+  socio_id uuid primary key references socios on delete cascade,
+  asiste_circulos boolean not null default false,
+  es_catequista boolean not null default false
+);
+
 -- Familias vinculadas a socios (una familia puede tener varios hijos)
 create table familiares_socios (
   email text check (email = lower(email)),
@@ -156,7 +163,8 @@ begin
     (new.id, 'Retiro mensual', 'RTME', 'mensual', 4),
     (new.id, 'Curso de retiro', 'CRT', 'anual', 5),
     (new.id, 'Preceptuación', 'PREC', 'semanal', 6),
-    (new.id, 'Sacerdote', 'SACD', 'semanal', 7);
+    (new.id, 'Sacerdote', 'SACD', 'semanal', 7),
+    (new.id, 'Conversación con los padres', 'PADR', 'trimestral', 8);
   return new;
 end $$;
 create trigger t_sembrar after insert on asociaciones
@@ -315,6 +323,7 @@ alter table preceptor_niveles   enable row level security;
 alter table socios              enable row level security;
 alter table periodos_alta       enable row level security;
 alter table socios_bancarios    enable row level security;
+alter table socios_equipo        enable row level security;
 alter table familiares_socios   enable row level security;
 alter table tipos_actividad     enable row level security;
 alter table registros_asistencia enable row level security;
@@ -371,6 +380,13 @@ create policy pa_upd on periodos_alta for update
 create policy sb_enc on socios_bancarios for all
   using (rol_en((select asociacion_id from socios where id = socio_id)) = 'encargado')
   with check (rol_en((select asociacion_id from socios where id = socio_id)) = 'encargado');
+
+-- Datos de equipo (solo encargado y preceptores con permiso; nunca la familia): círculos y catequesis
+create policy se_ver on socios_equipo for select using (puede_socio(socio_id, 'socios', 'ver'));
+create policy se_ins on socios_equipo for insert with check (puede_socio(socio_id, 'socios', 'editar'));
+create policy se_upd on socios_equipo for update
+  using (puede_socio(socio_id, 'socios', 'editar')) with check (puede_socio(socio_id, 'socios', 'editar'));
+create policy se_del on socios_equipo for delete using (puede_socio(socio_id, 'socios', 'editar'));
 
 create policy fs_ver on familiares_socios for select
   using (email = email_actual() or puede_socio(socio_id, 'socios', 'ver'));
