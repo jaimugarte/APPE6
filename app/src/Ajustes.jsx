@@ -13,6 +13,8 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState('preceptor')
   const [nombre, setNombre] = useState('')
+  const [nombrePre, setNombrePre] = useState('')
+  const [nombres, setNombres] = useState({}) // email -> nombre de preceptor que se está escribiendo
   const [abrNueva, setAbrNueva] = useState('')
   const [edicion, setEdicion] = useState({}) // id -> abreviatura que se está escribiendo
   const [per, setPer] = useState('semanal')
@@ -29,10 +31,10 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
     setMsg(error?.message || ''); recargar()
   }
   const toggleTipo = async (id, v) => { await supabase.from('tipos_actividad').update({ activa: v }).eq('id', id); cargar() }
-  // Comprueba que la abreviatura tenga entre 2 y 6 caracteres y no esté ya usada por otra actividad
+  // Comprueba que la abreviatura tenga entre 2 y 6 caracteres y no esté ya usada por otro evento
   const errorAbrev = (valor, idPropio) => {
     if (valor.length < 2) return 'La abreviatura debe tener entre 2 y 6 caracteres.'
-    if (tipos.some(t => t.id !== idPropio && abrev(t) === valor)) return `La abreviatura ${valor} ya la usa otra actividad.`
+    if (tipos.some(t => t.id !== idPropio && abrev(t) === valor)) return `La abreviatura ${valor} ya la usa otro evento.`
     return ''
   }
   const guardarAbrev = async t => {
@@ -44,7 +46,7 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
     if (sinCambio) return
     if (fallo) return setMsg(fallo)
     const { error } = await supabase.from('tipos_actividad').update({ abreviatura: valor }).eq('id', t.id)
-    setMsg(error?.code === '23505' ? `La abreviatura ${valor} ya la usa otra actividad.` : error?.message || '')
+    setMsg(error?.code === '23505' ? `La abreviatura ${valor} ya la usa otro evento.` : error?.message || '')
     cargar()
   }
   const addTipo = async () => {
@@ -54,15 +56,23 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
     if (fallo) return setMsg(fallo)
     const { error } = await supabase.from('tipos_actividad')
       .insert({ asociacion_id: asoc, nombre: nombre.trim(), abreviatura: candidata, periodicidad: per, orden: 99 })
-    setMsg(error?.code === '23505' ? 'Ya existe una actividad con ese nombre o esa abreviatura.' : error?.message || '')
+    setMsg(error?.code === '23505' ? 'Ya existe un evento con ese nombre o esa abreviatura.' : error?.message || '')
     if (!error) { setNombre(''); setAbrNueva('') }
     cargar()
   }
   const addAcceso = async () => {
     if (!email.trim()) return
-    const { error } = await supabase.from('accesos_permitidos')
-      .insert({ email: email.trim().toLowerCase(), asociacion_id: asoc, rol, anadido_por: uid })
-    setMsg(error?.message || ''); setEmail(''); cargar()
+    const fila = { email: email.trim().toLowerCase(), asociacion_id: asoc, rol, anadido_por: uid }
+    if (rol === 'preceptor' && nombrePre.trim()) fila.nombre = nombrePre.trim()
+    const { error } = await supabase.from('accesos_permitidos').insert(fila)
+    setMsg(error?.message || ''); setEmail(''); setNombrePre(''); cargar()
+  }
+  // El nombre del preceptor lo pone el encargado: es el que se ve en Campos de trabajo
+  const guardarNombre = async a => {
+    const v = (nombres[a.email] ?? a.nombre ?? '').trim()
+    if (v === (a.nombre || '')) return
+    const { error } = await supabase.from('accesos_permitidos').update({ nombre: v || null }).eq('email', a.email)
+    setMsg(error?.message || ''); cargar()
   }
   const delAcceso = async e => { await supabase.from('accesos_permitidos').delete().eq('email', e); cargar() }
 
@@ -83,7 +93,7 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
       </section>
 
       <section>
-        <h2>Actividades de interés</h2>
+        <h2>Eventos de interés</h2>
         <p className="sub">Marca las que quieres usar. La abreviatura es lo que se muestra en el móvil.</p>
         {tipos.map(t => (
           <div key={t.id} className="actividad">
@@ -98,8 +108,8 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
           </div>
         ))}
         <div className="fila nueva-actividad">
-          <input placeholder="Nueva actividad" value={nombre} onChange={e => setNombre(e.target.value)} />
-          <input className="abrev" maxLength={6} aria-label="Abreviatura de la nueva actividad" placeholder={nombre ? abrev({ nombre }) : 'Abrev.'}
+          <input placeholder="Nuevo evento" value={nombre} onChange={e => setNombre(e.target.value)} />
+          <input className="abrev" maxLength={6} aria-label="Abreviatura del nuevo evento" placeholder={nombre ? abrev({ nombre }) : 'Abrev.'}
             value={abrNueva} onChange={e => setAbrNueva(limpiarAbrev(e.target.value))} />
           <select value={per} onChange={e => setPer(e.target.value)}>
             {['semanal', 'mensual', 'trimestral', 'anual'].map(p => <option key={p}>{p}</option>)}
@@ -113,11 +123,17 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
         {accesos.map(a => (
           <div key={a.email} className="fila">
             {a.email} <small>({a.rol})</small>
+            {a.rol === 'preceptor' && (
+              <input className="nombre-pre" placeholder="Nombre del preceptor" aria-label={`Nombre de ${a.email}`} maxLength={80}
+                value={nombres[a.email] ?? a.nombre ?? ''} onChange={e => setNombres({ ...nombres, [a.email]: e.target.value })}
+                onBlur={() => guardarNombre(a)} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
+            )}
             <button onClick={() => delAcceso(a.email)}>Quitar</button>
           </div>
         ))}
         <div className="fila">
           <input type="email" placeholder="correo@gmail.com" value={email} onChange={e => setEmail(e.target.value)} />
+          {rol === 'preceptor' && <input placeholder="Nombre" maxLength={80} value={nombrePre} onChange={e => setNombrePre(e.target.value)} />}
           <select value={rol} onChange={e => setRol(e.target.value)}>
             <option value="preceptor">Preceptor</option><option value="familia">Familia</option>
           </select>

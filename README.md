@@ -64,19 +64,19 @@ Las familias no ven Socios ni Solicitudes: su inicio muestra el resumen (hijos d
 
 Cuota: en Ajustes el encargado define el importe mensual por orden de hermano (por defecto 35 € el hijo de alta más antiguo, 10 € el segundo y 0 € el resto; el último tramo vale para los siguientes). Los descuentos son por familia (en % o en €/mes) y los pone el encargado, o los preceptores si el encargado lo permite, desde la ficha del socio. Las familias no pueden pedirlos desde la app.
 
-## Planes
+## Actividades
 
-App `actividades` (se muestra como «Planes»): el encargado y los preceptores con permiso de **editar** publican planes (título, fecha o varios días, horas, lugar, **precio** y **descripción**) dirigidos a todos los niveles o a algunos. Se ven por **semana** (por defecto) o por **mes**.
+App `actividades` (antes «Planes»): el encargado y los preceptores con permiso de **editar** publican actividades, cada una de **tipo** Plan, Convivencia o Curso de Retiro (título, fecha o varios días, horas, lugar, **precio** y **descripción**) dirigidos a todos los niveles o a algunos. Se ven por **semana** (por defecto) o por **mes**.
 
-- Las familias ven los planes de los niveles de sus hijos de alta, y los dirigidos a todos.
+- Las familias ven las actividades de los niveles de sus hijos de alta, y los dirigidos a todos.
 - Un preceptor con ámbito «Solo su nivel» solo crea o edita planes de sus propios niveles (no para todos los niveles); con «Todos los niveles», cualquiera.
 - El precio es informativo: no se suma a las cuotas.
-- El administrador global debe conceder la app «Planes» a la asociación y el encargado activarla; luego, en Ajustes → Permisos, decide qué puede hacer cada preceptor.
+- El administrador global debe conceder la app «Actividades» a la asociación y el encargado activarla; luego, en Ajustes → Permisos, decide qué puede hacer cada preceptor.
 - Un proyecto nuevo solo necesita `supabase/schema.sql`. Si ya lo tenías creado, ejecuta además `supabase/actualizaciones.sql` (no repitas `schema.sql`).
 
 ## Portal de la familia
 
-El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Planes**.
+El inicio de la familia son cajas con un resumen en vivo: **Hijos socios** (altas, bajas, datos de la familia), **Cuotas** (cuota mensual, desglose e historial de pagos) y **Actividades**.
 
 ## Importar socios desde CSV
 
@@ -104,3 +104,18 @@ Un preceptor solo detecta duplicados entre los socios que puede ver.
 ## Datos de equipo del socio
 
 Desde 2º ESO la ficha muestra «Asiste a círculos» y «Es catequista» (por defecto «No»). Se guardan en una tabla aparte (`socios_equipo`) que solo ven el encargado y los preceptores con permiso sobre ese socio; las familias nunca. Hay una nueva actividad de asistencia «Conversación con los padres» (PADR, trimestral por defecto; el encargado puede cambiarla en Ajustes).
+
+## Nomenclatura
+
+- **Eventos**: lo que antes eran «actividades» de asistencia (Charla, Círculo, Visita de pobres, Retiro mensual, Curso de retiro, Preceptuación, Sacerdote, Conversación con los padres…). Se eligen en Ajustes y se marcan en Asistencia.
+- **Actividades**: lo que antes eran «planes» (calendario). Tipo: Plan, Convivencia o Curso de Retiro.
+
+## Campos de trabajo
+
+App `campos_trabajo` para el equipo: **todos los preceptores tienen acceso** (no aparece en los permisos de Ajustes) además del encargado; las familias no la ven. El administrador global la concede y el encargado la activa como las demás.
+
+- **Campos**: «+ Nuevo campo de trabajo» (nombre, fecha, descripción, responsable —un preceptor— y socios). La cantidad ganada se asigna **por socio** («Dar a todos») o como **total a repartir** a partes iguales (sin perder céntimos), y después se puede cambiar socio a socio. Los preceptores ven todos los socios aquí (solo nombre y curso), no únicamente los de su nivel.
+- **Resumen por socio**: lista con curso y **disponible** (ganado − retirado). Al tocar un socio se ve el detalle de sus campos y sus retiradas.
+- **Retirar dinero**: se elige una **Convivencia o Curso de Retiro** disponible para ese socio (de su nivel o para todos, y que no acabara hace más de 90 días); no se puede retirar más que el disponible. Solo el encargado puede anular una retirada.
+- Salvaguardas en la base de datos: nadie puede quedar con saldo negativo (no se baja lo ganado ni se borra un campo del que ya se retiró dinero).
+- **Nombre de los preceptores**: lo escribe el encargado en Ajustes → Cuentas con acceso; es el que se ve como responsable.

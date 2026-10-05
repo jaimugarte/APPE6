@@ -391,3 +391,24 @@ input.importe { width: 84px; min-height: 40px; text-align: right; }
 .chip.nv { background: color-mix(in srgb, var(--c) 14%, #fff); color: var(--tinta); border: 1px solid color-mix(in srgb, var(--c) 40%, #fff); }
 .pie-grafico { display: grid; gap: 10px; margin-top: 10px; }
 .pie-grafico .filtro-nivel { margin-bottom: 0; }
+.chip.tipo-act { background: var(--tinta); color: #fff; font-weight: 600; }
+.nombre-pre { flex: 1 1 140px; min-width: 120px; max-width: 220px; }
+
+/* ---------- Campos de trabajo ---------- */
+.campos .seg { margin-bottom: 14px; }
+.importe-lista { font-family: var(--serif); font-size: 1.05rem; white-space: nowrap; }
+.item .disp { display: grid; text-align: right; gap: 0; }
+.item .disp small { color: var(--tinta-3); font-size: .7rem; }
+.item .disp b { font-family: var(--serif); font-size: 1.1rem; }
+.total-lista { margin: 10px 2px; color: var(--tinta-2); font-size: .9rem; }
+.kpis.tres { grid-template-columns: repeat(3, 1fr); }
+.kpis.tres .kpi b { font-size: 1.3rem; }
+.fila-dato { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--linea); }
+.fila-dato small { color: var(--tinta-3); margin-left: 6px; }
+.form-retirada { margin: 12px 0; padding: 14px 16px; background: var(--superficie); border: 1px solid var(--acento-borde); border-radius: var(--r-md); }
+.reparto { display: grid; gap: 8px; margin-bottom: 10px; padding: 10px 12px; background: var(--acento-suave); border-radius: var(--r-md); }
+.reparto .fila { padding: 0; }
+.reparto input { flex: 1 1 160px; min-width: 0; }
+.participante input.importe { width: 84px; min-height: 40px; text-align: right; }
+.lista-candidatos { max-height: 360px; overflow: auto; }
+.campos h3 { font-size: 1rem; margin: 16px 0 6px; }

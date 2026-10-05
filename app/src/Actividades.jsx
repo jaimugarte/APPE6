@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { NIVELES, hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodoCorta, deIso, aIso } from './util'
 import { eur } from './cuotas'
+import { TIPOS_ACT, etiquetaTipo } from './tiposActividad'
 import { colorNivel, colorPlan, ordenarNiveles, pasaFiltro, COLOR_TODOS } from './coloresNivel'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -11,7 +12,7 @@ const diaLargo = iso => {
   const d = deIso(iso)
   return `${DIAS[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`
 }
-const VACIO = { titulo: '', descripcion: '', lugar: '', fecha: '', fecha_fin: '', hora_inicio: '', hora_fin: '', precio: '', niveles: [] }
+const VACIO = { tipo: 'plan', titulo: '', descripcion: '', lugar: '', fecha: '', fecha_fin: '', hora_inicio: '', hora_fin: '', precio: '', niveles: [] }
 
 const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const diaCompleto = iso => {
@@ -19,7 +20,7 @@ const diaCompleto = iso => {
   return `${DIAS[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MESES_L[d.getMonth()]}`
 }
 
-// Planes y actividades como un calendario (semana o mes). Se toca un día para ver el detalle.
+// Actividades (planes, convivencias y cursos de retiro) como un calendario (semana o mes). Se toca un día para ver el detalle.
 // Cada plan lleva el color de su nivel y se puede filtrar por nivel.
 // Las familias ven los planes de los niveles de sus hijos; el encargado y los preceptores con permiso de edición los crean.
 export default function Actividades({ asoc, rol, email }) {
@@ -89,8 +90,8 @@ export default function Actividades({ asoc, rol, email }) {
   return (
     <main className="actividades">
       <div className="barra">
-        <h2>Planes</h2>
-        {puedeCrear && <button className="primario" onClick={() => setEditando({ ...VACIO, fecha: sel || hoyIso, fecha_fin: sel || hoyIso })}>+ Nuevo plan</button>}
+        <h2>Actividades</h2>
+        {puedeCrear && <button className="primario" onClick={() => setEditando({ ...VACIO, fecha: sel || hoyIso, fecha_fin: sel || hoyIso })}>+ Nueva actividad</button>}
       </div>
       {msg && <p className="error">{msg}</p>}
 
@@ -130,7 +131,7 @@ export default function Actividades({ asoc, rol, email }) {
             const l = delDia(iso)
             return (
               <button key={iso} role="gridcell" aria-selected={iso === sel}
-                aria-label={`${diaCompleto(iso)}${l.length ? `, ${l.length} ${l.length === 1 ? 'plan' : 'planes'}` : ', sin planes'}`}
+                aria-label={`${diaCompleto(iso)}${l.length ? `, ${l.length} ${l.length === 1 ? 'actividad' : 'actividades'}` : ', sin actividades'}`}
                 className={'celda' + (iso === hoyIso ? ' hoy' : '') + (iso === sel ? ' sel' : '')} onClick={() => setSel(iso)}>
                 <span className="num-dia">{Number(iso.slice(8))}</span>
                 <span className="evs">
@@ -147,9 +148,9 @@ export default function Actividades({ asoc, rol, email }) {
         <section className="detalle-dia" aria-live="polite">
           <div className="barra">
             <h3>{diaCompleto(sel)}{sel === hoyIso && <span className="badge ok">Hoy</span>}</h3>
-            {puedeCrear && <button className="mini" onClick={() => setEditando({ ...VACIO, fecha: sel, fecha_fin: sel })}>+ Plan este día</button>}
+            {puedeCrear && <button className="mini" onClick={() => setEditando({ ...VACIO, fecha: sel, fecha_fin: sel })}>+ Actividad este día</button>}
           </div>
-          {delSel.length === 0 && <p className="aviso">No hay planes este día{filtro ? ` para ${filtro}` : ''}.</p>}
+          {delSel.length === 0 && <p className="aviso">No hay actividades este día{filtro ? ` para ${filtro}` : ''}.</p>}
           {delSel.map(p => <Plan key={p.id} p={p} editable={puedeEditar(p)} onEditar={() => setEditando(p)} />)}
         </section>
       )}
@@ -171,6 +172,7 @@ function Plan({ p, editable, onEditar }) {
         {p.lugar && <span>{p.lugar}</span>}
       </small>
       <div className="chips">
+        <span className="chip tipo-act">{etiquetaTipo(p.tipo)}</span>
         {p.niveles.length === 0
           ? <span className="chip nv" style={{ '--c': COLOR_TODOS }}>Todos los niveles</span>
           : ordenarNiveles(p.niveles).map(n => <span key={n} className="chip nv" style={{ '--c': colorNivel(n) }}>{n}</span>)}
@@ -202,7 +204,7 @@ function Editor({ plan, asoc, niveles, todos, onVolver, onGuardado }) {
     if (!(precio >= 0)) return setMsg('El precio no es válido.')
     if (!todos && f.niveles.length === 0) return setMsg('Elige al menos un nivel.')
     const fila = {
-      titulo: f.titulo.trim(), descripcion: f.descripcion.trim() || null, lugar: f.lugar.trim() || null,
+      tipo: f.tipo, titulo: f.titulo.trim(), descripcion: f.descripcion.trim() || null, lugar: f.lugar.trim() || null,
       fecha: f.fecha, fecha_fin: f.fecha_fin || f.fecha, hora_inicio: f.hora_inicio || null, hora_fin: f.hora_fin || null,
       precio, niveles: f.niveles
     }
@@ -225,17 +227,22 @@ function Editor({ plan, asoc, niveles, todos, onVolver, onGuardado }) {
   return (
     <main className="actividades">
       <div className="barra">
-        <h2>{nuevo ? 'Nuevo plan' : 'Editar plan'}</h2>
+        <h2>{nuevo ? 'Nueva actividad' : 'Editar actividad'}</h2>
         <button onClick={onVolver}>Cancelar</button>
       </div>
       <form className="formgrid" onSubmit={guardar}>
+        <label className="campo ancho"><span>Tipo</span>
+          <select value={f.tipo} onChange={e => set('tipo', e.target.value)}>
+            {TIPOS_ACT.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+          </select>
+        </label>
         <label className="campo ancho"><span>Título</span><input value={f.titulo} maxLength={120} onChange={e => set('titulo', e.target.value)} /></label>
         <label className="campo"><span>Fecha</span><input type="date" value={f.fecha} onChange={e => set('fecha', e.target.value)} /></label>
         <label className="campo"><span>Hasta (si dura varios días)</span><input type="date" value={f.fecha_fin} min={f.fecha} onChange={e => set('fecha_fin', e.target.value)} /></label>
         <label className="campo"><span>Hora de inicio</span><input type="time" value={f.hora_inicio} onChange={e => set('hora_inicio', e.target.value)} /></label>
         <label className="campo"><span>Hora de fin</span><input type="time" value={f.hora_fin} onChange={e => set('hora_fin', e.target.value)} /></label>
         <label className="campo"><span>Lugar</span><input value={f.lugar} maxLength={200} onChange={e => set('lugar', e.target.value)} /></label>
-        <label className="campo"><span>Precio del plan (€)</span><input inputMode="decimal" placeholder="0 = gratis" value={f.precio} onChange={e => set('precio', e.target.value)} /></label>
+        <label className="campo"><span>Precio (€)</span><input inputMode="decimal" placeholder="0 = gratis" value={f.precio} onChange={e => set('precio', e.target.value)} /></label>
         <label className="campo ancho"><span>Descripción</span><textarea rows={4} value={f.descripcion} maxLength={2000} onChange={e => set('descripcion', e.target.value)} /></label>
         <div className="campo ancho">
           <span>Niveles a los que va dirigido</span>
@@ -245,13 +252,13 @@ function Editor({ plan, asoc, niveles, todos, onVolver, onGuardado }) {
                 disabled={!niveles.includes(n)} onClick={() => alternar(n)}>{n}</button>
             ))}
           </div>
-          <small className="aviso">{todos ? 'Si no eliges ninguno, el plan es para todos los niveles.' : 'Solo puedes elegir entre tus niveles.'}</small>
+          <small className="aviso">{todos ? 'Si no eliges ninguno, la actividad es para todos los niveles.' : 'Solo puedes elegir entre tus niveles.'}</small>
         </div>
         {msg && <p className="error ancho">{msg}</p>}
         <div className="fila ancho">
-          <button className="primario" type="submit">{nuevo ? 'Crear plan' : 'Guardar'}</button>
+          <button className="primario" type="submit">{nuevo ? 'Crear actividad' : 'Guardar'}</button>
           {!nuevo && !borrar && <button type="button" className="peligro" onClick={() => setBorrar(true)}>Eliminar</button>}
-          {!nuevo && borrar && <button type="button" className="peligro" onClick={eliminar}>Sí, eliminar el plan</button>}
+          {!nuevo && borrar && <button type="button" className="peligro" onClick={eliminar}>Sí, eliminar la actividad</button>}
         </div>
       </form>
     </main>

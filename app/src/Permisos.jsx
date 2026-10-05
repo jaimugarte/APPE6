@@ -6,7 +6,8 @@ const POR_DEFECTO = { puede_ver: false, puede_editar: false, ambito: 'su_nivel' 
 
 // Pantalla del encargado: qué ve y edita cada preceptor, y de qué niveles se ocupa
 export default function Permisos({ asoc, apps }) {
-  const activas = apps.filter(a => a.activa)
+  // Campos de trabajo no se configura aquí: todos los preceptores tienen acceso
+  const activas = apps.filter(a => a.activa && a.app_clave !== 'campos_trabajo')
   const [perms, setPerms] = useState([])
   const [preceptores, setPreceptores] = useState([])
   const [niveles, setNiveles] = useState([])

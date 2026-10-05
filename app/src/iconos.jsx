@@ -16,6 +16,8 @@ export function IconoApp({ clave, size = 22 }) {
       return <svg {...p}><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.2-2h5.6L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" /><circle cx="12" cy="13" r="3.2" /></svg>
     case 'actividades':
       return <svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="3" /><path d="M8 3.5v4M16 3.5v4M4 10h16" /><path d="m9 15 2 2 4-4" /></svg>
+    case 'campos_trabajo':
+      return <svg {...p}><path d="M12 20v-8" /><path d="M12 12c0-3 2-5 5-5 0 3-2 5-5 5Z" /><path d="M12 15c0-2.5-1.8-4.2-4.5-4.2 0 2.6 1.8 4.2 4.5 4.2Z" /><path d="M6 20h12" /></svg>
     case 'hijos':
       return <svg {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path d="M18 8v6M15 11h6" /></svg>
     case 'cuotas':

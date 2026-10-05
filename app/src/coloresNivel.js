@@ -2,7 +2,7 @@ import { NIVELES } from './util.js'
 
 // Un color por nivel, para reconocerlos de un vistazo en el calendario
 const PALETA = ['#16a34a', '#65a30d', '#0d9488', '#0891b2', '#0284c7', '#2563eb', '#4f46e5', '#7c3aed', '#c026d3', '#db2777', '#ea580c', '#b45309', '#57534e']
-export const COLOR_TODOS = '#475569' // planes para todos los niveles
+export const COLOR_TODOS = '#475569' // actividades para todos los niveles
 
 export function colorNivel(n) {
   const i = NIVELES.indexOf(n)

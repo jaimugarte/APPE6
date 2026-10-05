@@ -141,7 +141,7 @@ function PantallaAsistencia({ asoc, rol, email }) {
   if (tipos === null || socios === null) return <main><p>Cargando…</p></main>
 
   if (tipos.length === 0)
-    return <main><p className="aviso">No hay actividades activas{esEncargado && ': defínelas en Ajustes'}.</p></main>
+    return <main><p className="aviso">No hay eventos activos{esEncargado && ': defínelas en Ajustes'}.</p></main>
 
   return (
     <main className="asistencia">

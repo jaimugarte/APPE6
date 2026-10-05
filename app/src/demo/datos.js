@@ -65,9 +65,10 @@ export function crearBD() {
     ],
     apps: [
       { clave: 'socios', nombre: 'Socios', descripcion: 'Base de datos de socios, altas y bajas' },
-      { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a actividades' },
+      { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a eventos' },
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
-      { clave: 'actividades', nombre: 'Planes', descripcion: 'Calendario de planes de la asociación' },
+      { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },
+      { clave: 'campos_trabajo', nombre: 'Campos de trabajo', descripcion: 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -76,12 +77,13 @@ export function crearBD() {
       { asociacion_id: ASOC, app_clave: 'asistencia', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'estadisticas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
+      { asociacion_id: ASOC, app_clave: 'campos_trabajo', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
     ],
     accesos_permitidos: [
       { email: 'encargado@demo.es', asociacion_id: ASOC, rol: 'encargado' },
-      { email: 'preceptor@demo.es', asociacion_id: ASOC, rol: 'preceptor' },
-      { email: 'preceptor2@demo.es', asociacion_id: ASOC, rol: 'preceptor' },
+      { email: 'preceptor@demo.es', asociacion_id: ASOC, rol: 'preceptor', nombre: 'Marcos Prieto' },
+      { email: 'preceptor2@demo.es', asociacion_id: ASOC, rol: 'preceptor', nombre: 'Lucía Ortega' },
       { email: 'familia@demo.es', asociacion_id: ASOC, rol: 'familia' }
     ],
     membresias: [
@@ -110,7 +112,7 @@ export function crearBD() {
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
       direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
-    planes: [],
+    planes: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [],
     pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
@@ -139,13 +141,15 @@ export function crearBD() {
   const lunes = inicioPeriodo(H, 'semanal')
   const dia = k => sumarPeriodos(lunes, 'semanal', 0) && iso(new Date(deIso(lunes).getTime() + k * 864e5 + 36e5 * 2))
   const plan = (id, k, kFin, titulo, niveles, extra) => db.planes.push({
-    id, asociacion_id: ASOC, titulo, descripcion: null, lugar: null, hora_inicio: null, hora_fin: null, precio: 0,
+    id, asociacion_id: ASOC, tipo: 'plan', titulo, descripcion: null, lugar: null, hora_inicio: null, hora_fin: null, precio: 0,
     niveles, fecha: dia(k), fecha_fin: dia(kFin), creado_por: 'u-enc', creado_en: H, ...extra })
   plan('pl-1', 2, 2, 'Torneo de fútbol', [], { descripcion: 'Torneo entre todos los niveles. Trae calzado deportivo y agua.', lugar: 'Polideportivo municipal', hora_inicio: '17:30', hora_fin: '20:00', precio: 3 })
   plan('pl-2', 5, 5, 'Excursión al monte', ['1º ESO', '2º ESO'], { descripcion: 'Ruta de senderismo de 8 km. Comida de bolsillo.', lugar: 'Sierra norte', hora_inicio: '09:00', hora_fin: '18:00', precio: 12 })
   plan('pl-3', 3, 3, 'Cine-fórum', ['6º primaria'], { descripcion: 'Película y charla posterior.', lugar: 'Sede del club', hora_inicio: '18:00', hora_fin: '20:00' })
   plan('pl-4', 9, 9, 'Gymkana de otoño', ['3º ESO'], { lugar: 'Parque central', hora_inicio: '11:00', precio: 2 })
-  plan('pl-5', 12, 13, 'Convivencia de fin de semana', [], { descripcion: 'Dos días en la casa de colonias.', lugar: 'Casa de colonias', precio: 45 })
+  plan('pl-6', 20, 22, 'Curso de retiro de otoño', ['3º ESO', '4º ESO', '1º Bachillerato'], { tipo: 'curso_retiro', lugar: 'Casa de retiros', precio: 90, descripcion: 'Tres días de retiro.' })
+  plan('pl-7', 16, 16, 'Convivencia de primaria', ['5º primaria', '6º primaria'], { tipo: 'convivencia', lugar: 'Albergue', precio: 30 })
+  plan('pl-5', 12, 13, 'Convivencia de fin de semana', [], { tipo: 'convivencia', descripcion: 'Dos días en la casa de colonias.', lugar: 'Casa de colonias', precio: 45 })
 
   // ---- Socios, altas y bajas ----
   let n = 0
@@ -189,6 +193,18 @@ export function crearBD() {
     if (k >= NIVELES_ORDEN.indexOf('2º ESO'))
       db.socios_equipo.push({ socio_id: s.id, asiste_circulos: i % 3 === 0, es_catequista: i % 7 === 0 && k >= NIVELES_ORDEN.indexOf('3º ESO') })
   })
+  // ---- Campos de trabajo de ejemplo ----
+  const deNivel = (...ns) => db.socios.filter(x => ns.includes(x.nivel) && db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja))
+  const campo = (id, nombre, dias, resp, descripcion, socios, importe) => {
+    db.campos_trabajo.push({ id, asociacion_id: ASOC, nombre, descripcion, fecha: iso(new Date(deIso(H).getTime() - dias * 864e5 + 36e5 * 2)),
+      responsable_email: resp, creado_por: 'u-enc', creado_en: H })
+    socios.forEach(x => db.campo_participantes.push({ campo_id: id, socio_id: x.id, importe }))
+  }
+  campo('ct-1', 'Vendimia', 60, 'preceptor2@demo.es', 'Dos días recogiendo uva en la finca de los Pérez.', deNivel('3º ESO', '4º ESO').slice(0, 6), 40)
+  campo('ct-2', 'Mercadillo solidario', 14, 'preceptor@demo.es', 'Puesto de manualidades en la plaza.', deNivel('1º ESO', '2º ESO').slice(0, 8), 15)
+  const conRetiro = db.campo_participantes.find(x => x.campo_id === 'ct-1')
+  if (conRetiro) db.retiradas_campo.push({ id: 'rc-1', asociacion_id: ASOC, socio_id: conRetiro.socio_id, actividad_id: 'pl-6',
+    actividad_titulo: 'Curso de retiro de otoño', importe: 30, fecha: H, nota: null, creado_por: 'u-enc', creado_en: H })
   db.socios_bancarios.push({ socio_id: 's-1', iban: 'ES9121000418450200051332' })
 
   // Dos hermanos vinculados a la cuenta de familia de ejemplo

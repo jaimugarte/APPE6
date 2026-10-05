@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], socios_equipo: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
 }
 
 const REL = {
@@ -89,6 +89,19 @@ export function crearClienteDemo() {
     return false
   }
 
+  // Campos de trabajo: encargado y todos los preceptores (sin pasar por permisos), si la app está activa
+  const esEquipo = (u, asoc) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, 'campos_trabajo')
+  const campoDe = id => db.campos_trabajo.find(c => c.id === id)
+  const saldoCampo = socioId =>
+    db.campo_participantes.filter(x => x.socio_id === socioId).reduce((a, x) => a + Number(x.importe), 0)
+    - db.retiradas_campo.filter(x => x.socio_id === socioId).reduce((a, x) => a + Number(x.importe), 0)
+  // Convivencias y cursos de retiro disponibles para un socio (de su nivel o para todos; acabadas hace menos de 90 días)
+  const actividadesParaRetirar = socio => {
+    const limite = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10)
+    return db.planes.filter(p => p.asociacion_id === socio.asociacion_id && ['convivencia', 'curso_retiro'].includes(p.tipo)
+      && p.fecha_fin >= limite && (!p.niveles.length || p.niveles.includes(socio.nivel))).sort((a, b) => a.fecha.localeCompare(b.fecha))
+  }
+
   // ¿Puede el usuario aprobar una solicitud con estos niveles? (encargado: todas; preceptor: según su alcance)
   function puedeAprobar(u, asoc, niveles) {
     if (!u || u.asoc !== asoc) return false
@@ -149,6 +162,9 @@ export function crearClienteDemo() {
       case 'pagos_cuota': { const f = db.familias.find(x => x.id === r.familia_id); return !!f && f.asociacion_id === u.asoc && (u.rol === 'encargado' || f.emails.includes(u.email)) }
       case 'config_cuotas': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'ver')
+      case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
+      case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id)
+      case 'retiradas_campo': return esEquipo(u, r.asociacion_id)
       case 'solicitudes_alta': return puedeAprobar(u, r.asociacion_id, r.niveles) || r.email === u.email
       default: return false
     }
@@ -167,6 +183,9 @@ export function crearClienteDemo() {
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
+      case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
+      case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id) && socioDe(r.socio_id)?.asociacion_id === campoDe(r.campo_id)?.asociacion_id
+      case 'retiradas_campo': return u.rol === 'encargado' && esEquipo(u, r.asociacion_id)  // solo se anulan; se crean con retirar_campo
       case 'pagos_cuota': return u.rol === 'encargado' && db.familias.find(x => x.id === r.familia_id)?.asociacion_id === u.asoc
       default: return false
     }
@@ -184,7 +203,9 @@ export function crearClienteDemo() {
     if (tabla === 'asociacion_apps') { f.permitida ??= false; f.activa ??= false }
     if (tabla === 'periodos_alta') { f.fecha_baja ??= null; f.motivo_baja ??= null }
     if (tabla === 'socios_equipo') { f.asiste_circulos ??= false; f.es_catequista ??= false }
-    if (tabla === 'planes') { f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
+    if (tabla === 'campos_trabajo') { f.descripcion ??= null; f.responsable_email ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
+    if (tabla === 'campo_participantes') f.importe ??= 0
+    if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
     if (tabla === 'enlaces_alta') { f.token ??= (uuid() + uuid()).replaceAll('-', ''); f.activo ??= true; f.caduca_en ??= null; f.creado_en ??= hoyIso }
     return f
@@ -257,6 +278,7 @@ export function crearClienteDemo() {
       if (this.op === 'select') {
         res = filas.filter(r => visible(tabla, r) && coincide(r))
       } else if (this.op === 'insert' || this.op === 'upsert') {
+        if (tabla === 'retiradas_campo') return err('42501', 'new row violates row-level security policy for table "retiradas_campo"') // solo con retirar_campo()
         const lista = Array.isArray(this.payload) ? this.payload : [this.payload]
         const conflicto = this.opts.onConflict ? this.opts.onConflict.split(',').map(s => s.trim()) : PK[tabla]
         for (const p of lista) {
@@ -274,9 +296,21 @@ export function crearClienteDemo() {
         }
       } else if (this.op === 'update') {
         res = filas.filter(r => visible(tabla, r) && coincide(r) && escribible(tabla, r))
+        const antes = res.map(r => ({ ...r }))
         res.forEach(r => Object.assign(r, this.payload))
+        if (tabla === 'campo_participantes' && res.some(r => saldoCampo(r.socio_id) < 0)) {
+          res.forEach((r, i) => Object.assign(r, antes[i]))
+          return err('P0001', 'No se puede: el socio ya ha retirado más dinero del que le quedaría')
+        }
       } else if (this.op === 'delete') {
         res = filas.filter(r => visible(tabla, r) && coincide(r) && escribible(tabla, r))
+        let quitadas = []
+        if (tabla === 'campos_trabajo') res.forEach(r => { quitadas.push(...db.campo_participantes.filter(x => x.campo_id === r.id)); db.campo_participantes = db.campo_participantes.filter(x => x.campo_id !== r.id) })
+        if (tabla === 'campo_participantes') quitadas = res
+        if ((tabla === 'campos_trabajo' || tabla === 'campo_participantes') && quitadas.some(x => saldoCampo(x.socio_id) < 0)) {
+          if (tabla === 'campos_trabajo') db.campo_participantes.push(...quitadas)
+          return err('P0001', 'No se puede: el socio ya ha retirado más dinero del que le quedaría')
+        }
         for (const r of res) { filas.splice(filas.indexOf(r), 1); efectosAlBorrar(tabla, r) }
       }
 
@@ -335,6 +369,34 @@ export function crearClienteDemo() {
     rpc: async (nombre, a = {}) => {
       const u = ctx()
       const hoyIso = new Date().toISOString().slice(0, 10)
+      if (nombre === 'socios_campos') {
+        if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
+        return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
+          activo: db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja) })).sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
+      }
+      if (nombre === 'lista_preceptores') {
+        if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
+        return { data: db.accesos_permitidos.filter(x => x.asociacion_id === u.asoc && x.rol === 'preceptor').map(x => ({ email: x.email, nombre: x.nombre ?? null })), error: null }
+      }
+      if (nombre === 'actividades_para_retirar') {
+        const sc = socioDe(a.p_socio)
+        if (!sc || !esEquipo(u, sc.asociacion_id)) return { data: [], error: null }
+        return { data: structuredClone(actividadesParaRetirar(sc)), error: null }
+      }
+      if (nombre === 'retirar_campo') {
+        const sc = socioDe(a.p_socio)
+        if (!sc || !esEquipo(u, sc.asociacion_id)) return err('P0001', 'Sin permiso')
+        const imp = Number(a.p_importe)
+        if (!(imp > 0)) return err('P0001', 'El importe debe ser mayor que 0')
+        const act = actividadesParaRetirar(sc).find(x => x.id === a.p_actividad)
+        if (!act) return err('P0001', 'Esa actividad no está disponible para este socio')
+        const saldo = saldoCampo(sc.id)
+        if (imp > saldo + 1e-9) return err('P0001', `El socio solo tiene ${saldo.toFixed(2)} € disponibles`)
+        const id = uuid()
+        db.retiradas_campo.push({ id, asociacion_id: sc.asociacion_id, socio_id: sc.id, actividad_id: act.id, actividad_titulo: act.titulo,
+          importe: Math.round(imp * 100) / 100, fecha: hoyIso, nota: String(a.p_nota ?? '').trim().slice(0, 300) || null, creado_por: u.id, creado_en: hoyIso })
+        return { data: id, error: null }
+      }
       if (nombre === 'info_enlace') return { data: enlaceVigente(a.p_token) ? db.asociaciones.find(x => x.id === enlaceVigente(a.p_token).asociacion_id).nombre : null, error: null }
       if (nombre === 'solicitar_alta_familia') {
         const enl = enlaceVigente(a.p_token), t = a.p_datos || {}

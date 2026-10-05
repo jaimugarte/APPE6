@@ -164,7 +164,7 @@ export default function Estadisticas({ asoc, rol }) {
           </div>
         )}>
         {!asis
-          ? <p className="aviso">No hay actividades activas.</p>
+          ? <p className="aviso">No hay eventos activos.</p>
           : vistaSemanal === 'cursos'
             ? (oAsisNivel
               ? <Grafico option={oAsisNivel} alto={300} etiqueta={`Asistencia a ${tipo.nombre} por cursos`} />
@@ -180,7 +180,7 @@ export default function Estadisticas({ asoc, rol }) {
               title="Socios distintos que asistieron al menos una vez en el mes" onClick={() => setModoMensual('distintos')}>Distintos</button>
             <button className={modoEf === 'media' ? 'on' : ''} aria-pressed={modoEf === 'media'}
               disabled={tipo.periodicidad !== 'semanal'}
-              title={tipo.periodicidad === 'semanal' ? 'Asistentes por semana, de media, en el mes' : 'Solo para actividades semanales'}
+              title={tipo.periodicidad === 'semanal' ? 'Asistentes por semana, de media, en el mes' : 'Solo para eventos semanales'}
               onClick={() => setModoMensual('media')}>Media/sem.</button>
           </div>
         )}
@@ -188,10 +188,10 @@ export default function Estadisticas({ asoc, rol }) {
           filas: asisMes.map(s => [s.etiqueta, s.distintos, ...(tipo.periodicidad === 'semanal' ? [s.media ?? '—'] : [])]) }}>
         {asisMes
           ? <Grafico option={oAsisMes} etiqueta={`Asistencia mensual a ${tipo.nombre}`} />
-          : <p className="aviso">No hay actividades activas.</p>}
+          : <p className="aviso">No hay eventos activos.</p>}
       </Tarjeta>
 
-      <Tarjeta titulo="Asistencia por nivel y actividad" subtitulo="Asistentes de media por periodo (semana, mes…) en el rango seleccionado"
+      <Tarjeta titulo="Asistencia por nivel y evento" subtitulo="Asistentes de media por periodo (semana, mes…) en el rango seleccionado"
         extra={(
           <div className="seg" role="group" aria-label="Grupo de niveles">
             {Object.entries(calc.GRUPOS).map(([k, g]) => (
@@ -207,7 +207,7 @@ export default function Estadisticas({ asoc, rol }) {
           })]) } : null}>
         {oMapa
           ? <Grafico option={oMapa} alto={mapa.niveles.length * 34 + 110}
-              etiqueta={`Asistentes de media por nivel y actividad, ${calc.GRUPOS[grupo].nombre}`} />
+              etiqueta={`Asistentes de media por nivel y evento, ${calc.GRUPOS[grupo].nombre}`} />
           : <p className="aviso">Todavía no hay datos de asistencia de {calc.GRUPOS[grupo].nombre} en este periodo.</p>}
       </Tarjeta>
     </main>
