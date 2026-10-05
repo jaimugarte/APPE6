@@ -104,8 +104,9 @@ export function crearBD() {
     enlaces_alta: [{ id: 'e-1', asociacion_id: ASOC, token: 'demo-invitacion', activo: true, caduca_en: null, creado_en: H }],
     familias: [{ id: 'f-1', asociacion_id: ASOC, emails: ['familia@demo.es'], nombre_padre: 'Antonio Demo', nombre_madre: 'María Prueba',
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
-      direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: 'Descuento concedido por el encargado', creada_en: H }],
+      direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
+    pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
       { id: 'sol-1', asociacion_id: ASOC, tipo: 'familia', estado: 'pendiente', email: 'jorge.nuevo@example.com',
@@ -119,6 +120,14 @@ export function crearBD() {
         niveles: ['2º ESO'], motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: H,
         datos: { nombre: 'Lucas', apellidos: 'Demo Prueba', fecha_nacimiento: '2013-05-20', nivel: '2º ESO', alergias: '', correo_socio: '' } }
     ]
+  }
+
+  // ---- Pagos de cuota de la familia de ejemplo: seis meses, el actual pendiente ----
+  for (let i = 0; i < 6; i++) {
+    const m = deIso(H); m.setDate(1); m.setMonth(m.getMonth() - i)
+    const mes = iso(m)
+    db.pagos_cuota.push({ familia_id: 'f-1', mes, importe: i > 3 ? 45 : 40.5,
+      pagado_en: i === 0 ? null : `${mes.slice(0, 8)}0${2 + (i % 5)}`, nota: null })
   }
 
   // ---- Socios, altas y bajas ----

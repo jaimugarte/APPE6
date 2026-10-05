@@ -241,7 +241,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
 
       {!nuevo && <Periodos socio={socio} puedeEditar={puedeEditar} onCambio={onCambio} />}
       {!nuevo && (esEncargado || puedeEditar) && <Familia socio={socio} esEncargado={esEncargado} onVinculo={() => setVersionCuota(v => v + 1)} />}
-      {!nuevo && <CuotaFamilia key={versionCuota} socio={socio} />}
+      {!nuevo && <CuotaFamilia key={versionCuota} socio={socio} esEncargado={esEncargado} />}
     </main>
   )
 }
@@ -365,7 +365,7 @@ function Familia({ socio, esEncargado, onVinculo }) {
 }
 
 // Cuota mensual de la familia de este socio y descuento (lo pone el encargado o, si se permite, el preceptor)
-function CuotaFamilia({ socio }) {
+function CuotaFamilia({ socio, esEncargado }) {
   const [c, setC] = useState(undefined) // undefined = cargando, null = sin familia registrada
   const [tipo, setTipo] = useState('porcentaje')
   const [valor, setValor] = useState('')
@@ -417,8 +417,48 @@ function CuotaFamilia({ socio }) {
           ) : (
             c.descuento_valor > 0 && c.descuento_nota && <p className="aviso">Motivo del descuento: {c.descuento_nota}</p>
           )}
+          {esEncargado && <RegistroPagos familiaId={c.familia_id} cuota={c.total} />}
         </>
       )}
     </section>
+  )
+}
+
+// El encargado registra los pagos mensuales de la familia (sin fecha de pago = pendiente)
+function RegistroPagos({ familiaId, cuota }) {
+  const mesActual = hoy().slice(0, 7)
+  const [mes, setMes] = useState(mesActual)
+  const [importe, setImporte] = useState(String(cuota))
+  const [pagado, setPagado] = useState(hoy())
+  const [pagos, setPagos] = useState([])
+  const [msg, setMsg] = useState('')
+
+  const cargar = async () => setPagos((await supabase.from('pagos_cuota').select('mes, importe, pagado_en')
+    .eq('familia_id', familiaId).order('mes', { ascending: false }).range(0, 5)).data || [])
+  useEffect(() => { cargar() }, [familiaId])
+
+  const guardar = async () => {
+    setMsg('')
+    const n = Number(importe.replace(',', '.'))
+    if (!mes || !Number.isFinite(n) || n < 0) return setMsg('Indica un mes y un importe válidos.')
+    const { error } = await supabase.from('pagos_cuota').upsert({ familia_id: familiaId, mes: `${mes}-01`, importe: n, pagado_en: pagado || null })
+    setMsg(error?.message || ''); cargar()
+  }
+
+  return (
+    <div className="registro-pagos">
+      <h3>Registrar pago</h3>
+      <div className="fila">
+        <input type="month" aria-label="Mes" value={mes} onChange={e => setMes(e.target.value)} />
+        <input className="importe" inputMode="decimal" aria-label="Importe" value={importe} onChange={e => setImporte(e.target.value)} />
+        <input type="date" aria-label="Fecha de pago (vacía = pendiente)" value={pagado} onChange={e => setPagado(e.target.value)} />
+        <button onClick={guardar}>Guardar</button>
+      </div>
+      <p className="aviso">Deja la fecha vacía para marcar el mes como pendiente.</p>
+      {msg && <p className="error">{msg}</p>}
+      {pagos.map(p => (
+        <div key={p.mes} className="fila"><b>{p.mes.slice(0, 7)}</b> {p.importe} € · {p.pagado_en ? `pagado ${fecha(p.pagado_en)}` : 'pendiente'}</div>
+      ))}
+    </div>
   )
 }

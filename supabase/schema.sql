@@ -435,6 +435,16 @@ create table familias (
 );
 create index on familias using gin (emails);
 
+-- Pagos de cuota por mes (los registra el encargado). Sin fecha de pago = pendiente.
+create table pagos_cuota (
+  familia_id uuid references familias on delete cascade,
+  mes date check (mes = date_trunc('month', mes)::date),
+  importe numeric(8,2) not null check (importe >= 0),
+  pagado_en date,
+  nota text,
+  primary key (familia_id, mes)
+);
+
 -- Criterio de cuotas de la asociación: importe mensual según el orden del hijo en la familia
 -- (importes[1] = hijo de alta más antiguo, importes[2] = segundo…; el último vale para todos los siguientes).
 -- Sin fila = criterio por defecto: 35 €, 10 € y 0 € para el resto.
@@ -770,6 +780,7 @@ alter table familias            enable row level security;
 alter table permisos_aprobacion enable row level security;
 alter table solicitudes_alta    enable row level security;
 alter table config_cuotas       enable row level security;
+alter table pagos_cuota         enable row level security;
 
 -- Solo el encargado gestiona enlaces y permisos de aprobación (cada preceptor ve el suyo).
 -- Las solicitudes solo se crean y resuelven con las funciones de arriba: no hay políticas de escritura.
@@ -785,4 +796,16 @@ create policy sa_ver on solicitudes_alta for select
   using (puede_aprobar(asociacion_id, niveles) or email = email_actual());
 create policy cc_enc on config_cuotas for all
   using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
+
+-- Pagos: los ve la propia familia y el encargado; solo el encargado los registra
+create function familia_visible(p_familia uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from familias f where f.id = p_familia
+                 and (rol_en(f.asociacion_id) = 'encargado' or email_actual() = any(f.emails))) $$;
+create function familia_gestionable(p_familia uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from familias f where f.id = p_familia and rol_en(f.asociacion_id) = 'encargado') $$;
+create policy pc_ver on pagos_cuota for select using (familia_visible(familia_id));
+create policy pc_enc on pagos_cuota for all
+  using (familia_gestionable(familia_id)) with check (familia_gestionable(familia_id));
 

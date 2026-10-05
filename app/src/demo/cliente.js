@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes']
 }
 
 const REL = {
@@ -125,6 +125,7 @@ export function crearClienteDemo() {
       case 'enlaces_alta': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'familias': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.emails.includes(u.email))
       case 'permisos_aprobacion': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.email === u.email)
+      case 'pagos_cuota': { const f = db.familias.find(x => x.id === r.familia_id); return !!f && f.asociacion_id === u.asoc && (u.rol === 'encargado' || f.emails.includes(u.email)) }
       case 'config_cuotas': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'solicitudes_alta': return puedeAprobar(u, r.asociacion_id, r.niveles) || r.email === u.email
       default: return false
@@ -142,6 +143,7 @@ export function crearClienteDemo() {
       case 'accesos_permitidos': return u.admin || (u.rol === 'encargado' && r.asociacion_id === u.asoc && r.rol !== 'encargado')
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
+      case 'pagos_cuota': return u.rol === 'encargado' && db.familias.find(x => x.id === r.familia_id)?.asociacion_id === u.asoc
       default: return false
     }
   }

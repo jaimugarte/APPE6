@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { fecha, edad, nivelPorNacimiento } from './util'
-import { eur, textoDescuento } from './cuotas'
+import { eur } from './cuotas'
 import ConfirmarBaja from './ConfirmarBaja'
 
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
@@ -14,7 +14,8 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
   const [pendientes, setPendientes] = useState([])
   const [familia, setFamilia] = useState(null)
   const [cuota, setCuota] = useState(null)
-  const [vista, setVista] = useState('inicio') // 'inicio' | 'familia' | 'nuevo' | id de hijo
+  const [vista, setVista] = useState('inicio') // 'inicio' | 'familia' | 'nuevo' | 'pagos' | id de hijo
+  const [desglose, setDesglose] = useState(false)
   const [msg, setMsg] = useState('')
 
   const cargar = useCallback(async () => {
@@ -40,6 +41,8 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
 
   if (vista === 'familia')
     return <DatosFamilia familia={familia} onVolver={() => setVista('inicio')} onCambio={cambio} />
+  if (vista === 'pagos')
+    return <HistorialPagos familiaId={cuota?.familia_id} onVolver={() => setVista('inicio')} />
   if (vista === 'nuevo')
     return <NuevoHijo onVolver={() => setVista('inicio')} onCambio={cambio} />
   if (vista !== 'inicio') {
@@ -62,15 +65,24 @@ export default function FamiliaInicio({ onCambio, arriba, abajo }) {
       {arriba}
       <section className="resumen-cuota">
         <div className="kpis dos">
-          <div className="kpi"><span>Hijos de alta</span><b>{activos.length}</b></div>
-          <div className="kpi"><span>Cuota total</span><b>{cuota ? eur(cuota.total) : '—'}<small>/mes</small></b></div>
+          <div className="kpi"><span>Hijos socios</span><b>{activos.length}</b></div>
+          <div className="kpi cuota">
+            <button className="kpi-btn" aria-expanded={desglose} onClick={() => setDesglose(d => !d)} disabled={!cuota}>
+              <span>Cuota mensual total</span>
+              <b>{cuota ? eur(cuota.total) : '—'}<small>/mes</small></b>
+            </button>
+            {cuota && <button className="enlace-mini" onClick={() => setVista('pagos')}>Ver historial de pagos</button>}
+          </div>
         </div>
-        {cuota && cuota.descuento_valor > 0 && (
-          <p className="descuento">
-            Descuento concedido: <b>{textoDescuento(cuota.descuento_tipo, cuota.descuento_valor)}</b>
-            {cuota.descuento > 0 && <> (−{eur(cuota.descuento)}/mes)</>}
-            {cuota.descuento_nota && <small> · {cuota.descuento_nota}</small>}
-          </p>
+        {desglose && cuota && (
+          <div className="desglose">
+            {cuota.detalle.map(d => {
+              const h = hijos.find(x => x.id === d.socio_id)
+              return <div key={d.socio_id}><span>{h ? `${h.nombre} ${h.apellidos}` : 'Hijo/a'}</span><b>{eur(d.importe)}</b></div>
+            })}
+            {cuota.descuento > 0 && <div><span>Descuento</span><b>−{eur(cuota.descuento)}</b></div>}
+            <div className="total"><span>Total al mes</span><b>{eur(cuota.total)}</b></div>
+          </div>
         )}
       </section>
 
@@ -277,6 +289,42 @@ function DatosFamilia({ familia, onVolver, onCambio }) {
         {msg && <span className="error">{msg}</span>}
         {ok && <span className="okmsg">{ok}</span>}
       </div>
+    </main>
+  )
+}
+
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+// Pagos de cuota, un mes por fila, del más reciente al más antiguo
+function HistorialPagos({ familiaId, onVolver }) {
+  const [pagos, setPagos] = useState(null)
+  useEffect(() => {
+    if (!familiaId) return setPagos([])
+    supabase.from('pagos_cuota').select('mes, importe, pagado_en').eq('familia_id', familiaId).order('mes', { ascending: false })
+      .then(({ data }) => setPagos(data || []))
+  }, [familiaId])
+
+  return (
+    <main>
+      <div className="barra"><button onClick={onVolver}>← Volver</button><h2>Historial de pagos</h2></div>
+      {pagos === null && <p>Cargando…</p>}
+      {pagos?.length === 0 && <p className="aviso">Todavía no hay pagos registrados.</p>}
+      {pagos?.length > 0 && (
+        <div className="tablaw">
+          <table>
+            <thead><tr><th>Mes</th><th className="num">Importe</th><th>Estado</th></tr></thead>
+            <tbody>
+              {[...pagos].sort((a, b) => b.mes.localeCompare(a.mes)).map(p => (
+                <tr key={p.mes}>
+                  <td>{MESES[Number(p.mes.slice(5, 7)) - 1]} {p.mes.slice(0, 4)}</td>
+                  <td className="num">{eur(p.importe)}</td>
+                  <td>{p.pagado_en ? <span className="badge ok">Pagado {fecha(p.pagado_en)}</span> : <span className="badge pend">Pendiente</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
   )
 }
