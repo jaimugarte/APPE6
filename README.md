@@ -53,3 +53,7 @@ Aviso: si faltan las claves de Supabase, la app arranca en modo demo y lo indica
 - El modo demo imita las reglas de acceso por rol, pero no es una réplica exacta de la base de datos real:
   sirve para ver y probar la app, no para validar la seguridad.
 - Los datos personales de menores están sujetos al RGPD y la LOPDGDD. La demo solo contiene datos inventados.
+
+## Solicitudes de alta
+
+El encargado crea un **enlace de invitación** en Ajustes y lo reparte a las familias. El enlace lleva a un formulario público (no hace falta cuenta) donde la familia solicita el alta; la solicitud la aprueba el encargado o un preceptor autorizado (Ajustes → «Quién aprueba las solicitudes»: no / solo su nivel / todas). Al aprobarla, la cuenta de Google de la familia queda autorizada; entonces entra, solicita el alta de cada hijo (que se aprueba igual) y puede pedir su baja. En la demo, el formulario está en `/?alta=demo-invitacion`.

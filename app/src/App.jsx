@@ -6,6 +6,8 @@ import Socios from './Socios'
 import Asistencia from './Asistencia'
 import { Logo, IconoApp } from './iconos'
 import { useFotoUrl } from './foto'
+import FormularioAlta from './FormularioAlta'
+import Solicitudes from './Solicitudes'
 
 // ECharts pesa bastante: solo se descarga al abrir Estadísticas
 const Estadisticas = lazy(() => import('./Estadisticas'))
@@ -25,7 +27,9 @@ export default function App() {
   const [ctx, setCtx] = useState(null)
   const [vista, setVista] = useState('hub')
   const [abierta, setAbierta] = useState(null)
-  const error = new URLSearchParams(location.search).get('error_description')
+  const params = new URLSearchParams(location.search)
+  const error = params.get('error_description')
+  const alta = params.get('alta') // enlace de invitación: formulario público de alta de familia
   const fotoUrl = useFotoUrl(ctx?.mem?.asociaciones?.foto_ruta)
 
   useEffect(() => {
@@ -57,10 +61,22 @@ export default function App() {
         .select('app_clave, puede_ver').eq('asociacion_id', mem.asociacion_id)
       permisos = data || []
     }
-    setCtx({ perfil, mem, apps, permisos })
+    // Solicitudes de alta: ¿puede este usuario aprobarlas y cuántas hay pendientes?
+    let aprueba = mem?.rol === 'encargado', pendientes = 0
+    if (mem?.rol === 'preceptor') {
+      const { data } = await supabase.from('permisos_aprobacion').select('alcance').eq('asociacion_id', mem.asociacion_id).maybeSingle()
+      aprueba = !!data && data.alcance !== 'ninguno'
+    }
+    if (aprueba) {
+      const { data } = await supabase.from('solicitudes_alta').select('id').eq('estado', 'pendiente')
+      pendientes = data?.length || 0
+    }
+    setCtx({ perfil, mem, apps, permisos, aprueba, pendientes })
   }, [session])
 
   useEffect(() => { cargar() }, [cargar])
+
+  if (alta) return <FormularioAlta token={alta} />
 
   if (session === undefined) return <p className="centro">Cargando…</p>
 
@@ -72,6 +88,7 @@ export default function App() {
         {DEMO ? (
           <>
             <p>Esta es una demo con datos de ejemplo. Elige con qué rol quieres entrar.</p>
+            <p className="aviso"><a href="/?alta=demo-invitacion">Ver el formulario de invitación para familias</a></p>
             <div className="roles-demo">
               {ROLES_DEMO.map(([k, titulo, desc]) => (
                 <button key={k} className="rol-demo" onClick={() => supabase.auth.entrarComo(k)}>
@@ -95,7 +112,7 @@ export default function App() {
 
   if (!ctx) return <p className="centro">Cargando…</p>
 
-  const { perfil, mem, apps, permisos } = ctx
+  const { perfil, mem, apps, permisos, aprueba, pendientes } = ctx
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
   // Las familias nunca ven Asistencia ni Estadísticas; sí el resto de apps (socios, anuncios, fotos…)
@@ -105,6 +122,8 @@ export default function App() {
       ? !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver
       : !SOLO_EQUIPO.includes(a.app_clave))
   const activas = apps.filter(a => a.activa && visible(a))
+  // Solicitudes no es una app del catálogo: la ven quien puede aprobar y las familias
+  const conSolicitudes = !!mem && (aprueba || mem.rol === 'familia')
 
   return (
     <div className="app">
@@ -122,7 +141,7 @@ export default function App() {
             </div>
           </div>
           <nav>
-            <button className={vista === 'hub' || vista === 'app' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
+            <button className={vista === 'hub' || vista === 'app' || vista === 'solicitudes' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
             {esEncargado && <button className={vista === 'ajustes' ? 'activo' : ''} onClick={() => setVista('ajustes')}>Ajustes</button>}
             {esAdmin && <button className={vista === 'admin' ? 'activo' : ''} onClick={() => setVista('admin')}>Admin</button>}
             <button onClick={() => supabase.auth.signOut()}>Salir</button>
@@ -148,6 +167,13 @@ export default function App() {
             </div>
           )}
           <div className="grid">
+            {conSolicitudes && (
+              <button className="tarjeta" onClick={() => setVista('solicitudes')}>
+                <span className="icono"><IconoApp clave="solicitudes" /></span>
+                <b>Solicitudes{pendientes > 0 && <span className="contador" aria-label={`${pendientes} pendientes`}>{pendientes}</span>}</b>
+                <span className="desc">{mem.rol === 'familia' ? 'Alta y baja de tus hijos' : 'Altas y bajas pendientes de aprobar'}</span>
+              </button>
+            )}
             {activas.map(a => (
               <button key={a.app_clave} className="tarjeta" onClick={() => { setAbierta(a); setVista('app') }}>
                 <span className="icono"><IconoApp clave={a.app_clave} /></span>
@@ -168,6 +194,7 @@ export default function App() {
         </Suspense>}
       {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
+      {vista === 'solicitudes' && conSolicitudes && <Solicitudes rol={mem.rol} onCambio={cargar} />}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}

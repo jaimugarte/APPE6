@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Permisos from './Permisos'
 import FotoAsociacion from './FotoAsociacion'
+import Invitaciones from './Invitaciones'
+import Aprobadores from './Aprobadores'
 import { abrev, limpiarAbrev } from './util'
 
 export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
@@ -122,6 +124,8 @@ export default function Ajustes({ asoc, apps, uid, fotoRuta, recargar }) {
         </div>
       </section>
 
+      <Invitaciones asoc={asoc} uid={uid} />
+      <Aprobadores asoc={asoc} />
       <Permisos asoc={asoc} apps={apps} />
     </main>
   )

@@ -9,7 +9,8 @@ const PK = {
   accesos_permitidos: ['email'], membresias: ['user_id'], permisos_preceptor: ['asociacion_id', 'app_clave'],
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
-  registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email']
+  registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id']
 }
 
 const REL = {
@@ -86,6 +87,20 @@ export function crearClienteDemo() {
     return false
   }
 
+  // ¿Puede el usuario aprobar una solicitud con estos niveles? (encargado: todas; preceptor: según su alcance)
+  function puedeAprobar(u, asoc, niveles) {
+    if (!u || u.asoc !== asoc) return false
+    if (u.rol === 'encargado') return true
+    if (u.rol !== 'preceptor') return false
+    const alc = db.permisos_aprobacion.find(p => p.asociacion_id === asoc && p.email === u.email)?.alcance
+    if (alc === 'todos') return true
+    return alc === 'su_nivel' && db.preceptor_niveles.some(n => n.asociacion_id === asoc && n.email === u.email && niveles.includes(n.nivel))
+  }
+
+  const enlaceVigente = token => db.enlaces_alta.find(e => e.token === token && e.activo && (!e.caduca_en || e.caduca_en > new Date().toISOString()))
+  const limpio = (v, n) => String(v ?? '').trim().slice(0, n)
+  const reCorreo = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
   function visible(tabla, r) {
     const u = ctx(); if (!u) return false
     switch (tabla) {
@@ -105,6 +120,10 @@ export function crearClienteDemo() {
       case 'familiares_socios': return r.email === u.email || puedeSocio(u, socioDe(r.socio_id), 'socios', 'ver')
       case 'registros_asistencia': return puedeSocio(u, socioDe(r.socio_id), 'asistencia', 'ver')
       case 'global_admins': return u.admin
+      case 'enlaces_alta': return r.asociacion_id === u.asoc && u.rol === 'encargado'
+      case 'familias': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.emails.includes(u.email))
+      case 'permisos_aprobacion': return r.asociacion_id === u.asoc && (u.rol === 'encargado' || r.email === u.email)
+      case 'solicitudes_alta': return puedeAprobar(u, r.asociacion_id, r.niveles) || r.email === u.email
       default: return false
     }
   }
@@ -118,7 +137,7 @@ export function crearClienteDemo() {
       case 'socios_bancarios': return u.rol === 'encargado' && socioDe(r.socio_id)?.asociacion_id === u.asoc
       case 'asociaciones': case 'asociacion_apps': case 'apps': case 'global_admins': return u.admin
       case 'accesos_permitidos': return u.admin || (u.rol === 'encargado' && r.asociacion_id === u.asoc && r.rol !== 'encargado')
-      case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad':
+      case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
       default: return false
     }
@@ -135,6 +154,7 @@ export function crearClienteDemo() {
     if (tabla === 'permisos_preceptor') { f.puede_ver ??= false; f.puede_editar ??= false; f.ambito ??= 'su_nivel' }
     if (tabla === 'asociacion_apps') { f.permitida ??= false; f.activa ??= false }
     if (tabla === 'periodos_alta') { f.fecha_baja ??= null; f.motivo_baja ??= null }
+    if (tabla === 'enlaces_alta') { f.token ??= (uuid() + uuid()).replaceAll('-', ''); f.activo ??= true; f.caduca_en ??= null; f.creado_en ??= hoyIso }
     return f
   }
 
@@ -282,6 +302,89 @@ export function crearClienteDemo() {
 
     rpc: async (nombre, a) => {
       const u = ctx()
+      const hoyIso = new Date().toISOString().slice(0, 10)
+      if (nombre === 'info_enlace') return { data: enlaceVigente(a.p_token) ? db.asociaciones.find(x => x.id === enlaceVigente(a.p_token).asociacion_id).nombre : null, error: null }
+      if (nombre === 'solicitar_alta_familia') {
+        const enl = enlaceVigente(a.p_token), t = a.p_datos || {}
+        if (!enl) return err('P0001', 'El enlace no es válido o ha caducado')
+        if (t.consentimiento !== true) return err('P0001', 'Debes aceptar el tratamiento de los datos')
+        const email = limpio(t.email, 120).toLowerCase()
+        let email2 = limpio(t.email2, 120).toLowerCase() || null
+        if (email2 === email) email2 = null
+        if (!reCorreo.test(email) || (email2 && !reCorreo.test(email2))) return err('P0001', 'Correo no válido')
+        if (!limpio(t.nombre_padre, 120) && !limpio(t.nombre_madre, 120)) return err('P0001', 'Indica al menos el nombre del padre o de la madre')
+        if (db.accesos_permitidos.some(x => x.email === email || x.email === email2)) return err('P0001', 'Ese correo ya tiene acceso a la aplicación')
+        if (db.solicitudes_alta.some(x => x.asociacion_id === enl.asociacion_id && x.tipo === 'familia' && x.estado === 'pendiente' && x.email === email))
+          return err('P0001', 'Ya hay una solicitud pendiente con ese correo')
+        db.solicitudes_alta.push({
+          id: uuid(), asociacion_id: enl.asociacion_id, tipo: 'familia', estado: 'pendiente', email,
+          niveles: (Array.isArray(t.niveles) ? t.niveles : []).slice(0, 8).map(n => limpio(n, 40)), socio_id: null,
+          motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
+          datos: { email2, nombre_padre: limpio(t.nombre_padre, 120), nombre_madre: limpio(t.nombre_madre, 120),
+            correo_padre: limpio(t.correo_padre, 120), correo_madre: limpio(t.correo_madre, 120),
+            movil_padre: limpio(t.movil_padre, 30), movil_madre: limpio(t.movil_madre, 30), direccion: limpio(t.direccion, 200) }
+        })
+        return { data: null, error: null }
+      }
+      if (nombre === 'solicitar_socio') {
+        if (u?.rol !== 'familia') return err('P0001', 'Solo las familias pueden solicitar el alta de un hijo')
+        const t = a.p_datos || {}, nivel = limpio(t.nivel, 40)
+        if (!limpio(t.nombre, 80) || !limpio(t.apellidos, 120) || !nivel) return err('P0001', 'Faltan datos obligatorios')
+        db.solicitudes_alta.push({
+          id: uuid(), asociacion_id: u.asoc, tipo: 'socio', estado: 'pendiente', email: u.email, niveles: [nivel], socio_id: null,
+          motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
+          datos: { nombre: limpio(t.nombre, 80), apellidos: limpio(t.apellidos, 120), fecha_nacimiento: limpio(t.fecha_nacimiento, 10),
+            nivel, alergias: limpio(t.alergias, 200), correo_socio: limpio(t.correo_socio, 120) }
+        })
+        return { data: null, error: null }
+      }
+      if (nombre === 'solicitar_baja') {
+        const s = socioDe(a.p_socio)
+        if (!u || !s || !esFamiliar(u, s.id)) return err('P0001', 'No puedes solicitar la baja de este socio')
+        if (!db.periodos_alta.some(p => p.socio_id === s.id && !p.fecha_baja)) return err('P0001', 'Este socio ya está de baja')
+        if (db.solicitudes_alta.some(x => x.tipo === 'baja' && x.estado === 'pendiente' && x.socio_id === s.id))
+          return err('P0001', 'Ya hay una solicitud de baja pendiente para este socio')
+        db.solicitudes_alta.push({
+          id: uuid(), asociacion_id: s.asociacion_id, tipo: 'baja', estado: 'pendiente', email: u.email, niveles: [s.nivel || ''],
+          socio_id: s.id, motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
+          datos: { motivo: limpio(a.p_motivo, 300), socio_nombre: `${s.nombre} ${s.apellidos}` }
+        })
+        return { data: null, error: null }
+      }
+      if (nombre === 'resolver_solicitud') {
+        const s = db.solicitudes_alta.find(x => x.id === a.p_id)
+        if (!s || !puedeAprobar(u, s.asociacion_id, s.niveles)) return err('P0001', 'No tienes permiso para resolver esta solicitud')
+        if (s.estado !== 'pendiente') return err('P0001', 'La solicitud ya estaba resuelta')
+        const d = s.datos
+        if (a.p_aprobar) {
+          if (s.tipo === 'familia') {
+            const emails = [s.email, d.email2].filter(Boolean)
+            if (db.accesos_permitidos.some(x => emails.includes(x.email) && x.asociacion_id !== s.asociacion_id))
+              return err('P0001', 'Un correo de la solicitud ya pertenece a otra asociación')
+            db.familias.push({ id: uuid(), asociacion_id: s.asociacion_id, emails, nombre_padre: d.nombre_padre || null,
+              nombre_madre: d.nombre_madre || null, correo_padre: d.correo_padre || null, correo_madre: d.correo_madre || null,
+              movil_padre: d.movil_padre || null, movil_madre: d.movil_madre || null, direccion: d.direccion || null, creada_en: hoyIso })
+            for (const e of emails) if (!db.accesos_permitidos.some(x => x.email === e))
+              db.accesos_permitidos.push({ email: e, asociacion_id: s.asociacion_id, rol: 'familia', anadido_por: u.id })
+          } else if (s.tipo === 'socio') {
+            const fam = db.familias.find(f => f.asociacion_id === s.asociacion_id && f.emails.includes(s.email)) || {}
+            const id = uuid()
+            db.socios.push({ id, asociacion_id: s.asociacion_id, nombre: d.nombre, apellidos: d.apellidos,
+              fecha_nacimiento: d.fecha_nacimiento || null, nivel: d.nivel, nombre_padre: fam.nombre_padre ?? null,
+              nombre_madre: fam.nombre_madre ?? null, alergias: d.alergias || null, direccion: fam.direccion ?? null,
+              correo_padre: fam.correo_padre ?? null, correo_madre: fam.correo_madre ?? null, correo_socio: d.correo_socio || null,
+              movil_padre: fam.movil_padre ?? null, movil_madre: fam.movil_madre ?? null, creado_en: hoyIso })
+            db.periodos_alta.push({ id: uuid(), socio_id: id, fecha_alta: hoyIso, fecha_baja: null, motivo_baja: null })
+            for (const e of fam.emails || [s.email]) db.familiares_socios.push({ email: e, socio_id: id })
+          } else {
+            const p = db.periodos_alta.find(x => x.socio_id === s.socio_id && !x.fecha_baja)
+            if (p) { p.fecha_baja = hoyIso < p.fecha_alta ? p.fecha_alta : hoyIso; p.motivo_baja = d.motivo || null }
+          }
+        }
+        Object.assign(s, { estado: a.p_aprobar ? 'aprobada' : 'rechazada', motivo_resolucion: limpio(a.p_motivo, 300) || null,
+          resuelta_por: u.id, resuelta_en: new Date().toISOString() })
+        return { data: null, error: null }
+      }
       if (nombre === 'establecer_foto_asociacion') {
         if (u?.rol !== 'encargado' || u.asoc !== a.p_asoc) return err('P0001', 'Solo el encargado')
         if (a.p_ruta != null && a.p_ruta.split('/')[0] !== a.p_asoc) return err('P0001', 'La foto debe estar en la carpeta de la asociación')

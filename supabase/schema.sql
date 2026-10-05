@@ -401,3 +401,231 @@ create policy af_cambiar on storage.objects for update to authenticated
   with check (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado');
 create policy af_borrar on storage.objects for delete to authenticated
   using (bucket_id = 'asociacion-fotos' and rol_en_carpeta(name) = 'encargado');
+
+-- ---------- SOLICITUDES DE ALTA Y BAJA ----------
+-- Flujo: el encargado crea un enlace de invitación → una familia rellena el formulario (sin cuenta) →
+-- la solicitud la aprueba quien tenga permiso → la familia queda autorizada, entra con Google y solicita
+-- el alta de sus hijos → se aprueba de nuevo. La baja de un hijo también se solicita y se aprueba.
+
+create table enlaces_alta (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  token text not null unique default replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
+  activo boolean not null default true,
+  caduca_en timestamptz,
+  creado_por uuid references perfiles,
+  creado_en timestamptz not null default now()
+);
+
+-- Una familia puede tener una o dos cuentas de Google (padre y madre)
+create table familias (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  emails text[] not null,
+  nombre_padre text, nombre_madre text,
+  correo_padre text, correo_madre text,
+  movil_padre text, movil_madre text,
+  direccion text,
+  creada_en timestamptz not null default now()
+);
+create index on familias using gin (emails);
+
+-- Qué preceptores pueden aprobar solicitudes: ninguna, solo las de sus niveles, o todas.
+-- Sin fila = ninguna. El encargado siempre puede aprobarlas todas.
+create table permisos_aprobacion (
+  asociacion_id uuid references asociaciones on delete cascade,
+  email text check (email = lower(email)),
+  alcance text not null default 'ninguno' check (alcance in ('ninguno', 'su_nivel', 'todos')),
+  primary key (asociacion_id, email)
+);
+
+create table solicitudes_alta (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  tipo text not null check (tipo in ('familia', 'socio', 'baja')),
+  estado text not null default 'pendiente' check (estado in ('pendiente', 'aprobada', 'rechazada')),
+  email text not null,                          -- cuenta de Google de la familia que solicita
+  niveles text[] not null default '{}',         -- decide qué preceptores de «su nivel» la ven
+  socio_id uuid references socios on delete cascade,   -- solo en las bajas
+  datos jsonb not null default '{}',
+  motivo_resolucion text,
+  resuelta_por uuid references perfiles,
+  resuelta_en timestamptz,
+  creada_en timestamptz not null default now()
+);
+create index on solicitudes_alta(asociacion_id, estado);
+create unique index un_solicitud_familia on solicitudes_alta(asociacion_id, email) where tipo = 'familia' and estado = 'pendiente';
+create unique index un_solicitud_baja on solicitudes_alta(socio_id) where tipo = 'baja' and estado = 'pendiente';
+
+-- ¿Puede el usuario actual aprobar una solicitud con estos niveles?
+create function puede_aprobar(p_asoc uuid, p_niveles text[]) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare v_alc text;
+begin
+  case rol_en(p_asoc)
+    when 'encargado' then return true;
+    when 'preceptor' then null;
+    else return false;
+  end case;
+  select alcance into v_alc from permisos_aprobacion where asociacion_id = p_asoc and email = email_actual();
+  if v_alc = 'todos' then return true; end if;
+  if v_alc = 'su_nivel' then
+    return exists (select 1 from preceptor_niveles
+                   where asociacion_id = p_asoc and email = email_actual() and nivel = any(p_niveles));
+  end if;
+  return false;
+end $$;
+
+-- Formulario público (sin sesión): nombre de la asociación a la que lleva el enlace
+create function info_enlace(p_token text) returns text
+language sql stable security definer set search_path = public as $$
+  select a.nombre from enlaces_alta e join asociaciones a on a.id = e.asociacion_id
+  where e.token = p_token and e.activo and (e.caduca_en is null or e.caduca_en > now()) $$;
+
+-- Formulario público (sin sesión): solicitud de alta de una familia. Valida y limpia todo en el servidor.
+create function solicitar_alta_familia(p_token text, p_datos jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_asoc uuid; v_email text; v_email2 text; v_niv text[];
+  v_re constant text := '^[^@\s]+@[^@\s]+\.[^@\s]+$';
+  t jsonb := coalesce(p_datos, '{}');
+begin
+  select e.asociacion_id into v_asoc from enlaces_alta e
+    where e.token = p_token and e.activo and (e.caduca_en is null or e.caduca_en > now());
+  if v_asoc is null then raise exception 'El enlace no es válido o ha caducado'; end if;
+  if (t->>'consentimiento') is distinct from 'true' then raise exception 'Debes aceptar el tratamiento de los datos'; end if;
+  v_email := lower(trim(coalesce(t->>'email', '')));
+  v_email2 := nullif(lower(trim(coalesce(t->>'email2', ''))), '');
+  if v_email2 = v_email then v_email2 := null; end if;
+  if v_email !~ v_re or (v_email2 is not null and v_email2 !~ v_re) then raise exception 'Correo no válido'; end if;
+  if trim(coalesce(t->>'nombre_padre', '')) = '' and trim(coalesce(t->>'nombre_madre', '')) = '' then
+    raise exception 'Indica al menos el nombre del padre o de la madre';
+  end if;
+  if exists (select 1 from accesos_permitidos where email in (v_email, coalesce(v_email2, v_email))) then
+    raise exception 'Ese correo ya tiene acceso a la aplicación';
+  end if;
+  if (select count(*) from solicitudes_alta where asociacion_id = v_asoc and estado = 'pendiente') >= 300 then
+    raise exception 'Hay demasiadas solicitudes pendientes. Inténtalo más tarde';
+  end if;
+  select coalesce(array_agg(left(x, 40)), '{}') into v_niv
+    from (select jsonb_array_elements_text(coalesce(t->'niveles', '[]'::jsonb)) x limit 8) q;
+  insert into solicitudes_alta(asociacion_id, tipo, email, niveles, datos)
+  values (v_asoc, 'familia', v_email, v_niv, jsonb_build_object(
+    'email2', v_email2,
+    'nombre_padre', left(trim(coalesce(t->>'nombre_padre', '')), 120),
+    'nombre_madre', left(trim(coalesce(t->>'nombre_madre', '')), 120),
+    'correo_padre', left(trim(coalesce(t->>'correo_padre', '')), 120),
+    'correo_madre', left(trim(coalesce(t->>'correo_madre', '')), 120),
+    'movil_padre', left(trim(coalesce(t->>'movil_padre', '')), 30),
+    'movil_madre', left(trim(coalesce(t->>'movil_madre', '')), 30),
+    'direccion', left(trim(coalesce(t->>'direccion', '')), 200)));
+exception when unique_violation then
+  raise exception 'Ya hay una solicitud pendiente con ese correo';
+end $$;
+
+grant execute on function info_enlace(text), solicitar_alta_familia(text, jsonb) to anon, authenticated;
+
+-- Una familia ya aprobada solicita el alta de un hijo
+create function solicitar_socio(p_datos jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_asoc uuid; v_nivel text; v_nac date; t jsonb := coalesce(p_datos, '{}');
+begin
+  select m.asociacion_id into v_asoc from membresias m where m.user_id = auth.uid() and m.rol = 'familia';
+  if v_asoc is null then raise exception 'Solo las familias pueden solicitar el alta de un hijo'; end if;
+  v_nivel := left(trim(coalesce(t->>'nivel', '')), 40);
+  if trim(coalesce(t->>'nombre', '')) = '' or trim(coalesce(t->>'apellidos', '')) = '' or v_nivel = '' then
+    raise exception 'Faltan datos obligatorios';
+  end if;
+  v_nac := nullif(t->>'fecha_nacimiento', '')::date;
+  insert into solicitudes_alta(asociacion_id, tipo, email, niveles, datos)
+  values (v_asoc, 'socio', email_actual(), array[v_nivel], jsonb_build_object(
+    'nombre', left(trim(t->>'nombre'), 80), 'apellidos', left(trim(t->>'apellidos'), 120),
+    'fecha_nacimiento', to_char(v_nac, 'YYYY-MM-DD'), 'nivel', v_nivel,
+    'alergias', left(trim(coalesce(t->>'alergias', '')), 200),
+    'correo_socio', left(trim(coalesce(t->>'correo_socio', '')), 120)));
+end $$;
+
+-- Una familia solicita la baja de uno de sus hijos
+create function solicitar_baja(p_socio uuid, p_motivo text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_s socios;
+begin
+  select * into v_s from socios where id = p_socio;
+  if v_s.id is null or not es_familiar_de(p_socio) then raise exception 'No puedes solicitar la baja de este socio'; end if;
+  if not exists (select 1 from periodos_alta where socio_id = p_socio and fecha_baja is null) then
+    raise exception 'Este socio ya está de baja';
+  end if;
+  insert into solicitudes_alta(asociacion_id, tipo, email, niveles, socio_id, datos)
+  values (v_s.asociacion_id, 'baja', email_actual(), array[coalesce(v_s.nivel, '')], p_socio,
+          jsonb_build_object('motivo', left(trim(coalesce(p_motivo, '')), 300),
+                             'socio_nombre', left(v_s.nombre || ' ' || v_s.apellidos, 200)));
+exception when unique_violation then
+  raise exception 'Ya hay una solicitud de baja pendiente para este socio';
+end $$;
+
+-- Aprobar o rechazar. Al aprobar se ejecuta el alta (o la baja) con permisos de sistema, de modo que un
+-- preceptor autorizado a aprobar no necesita permiso de edición sobre Socios.
+create function resolver_solicitud(p_id uuid, p_aprobar boolean, p_motivo text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare s solicitudes_alta; d jsonb; v_fam familias; v_socio uuid; v_emails text[];
+begin
+  select * into s from solicitudes_alta where id = p_id for update;
+  if s.id is null or not puede_aprobar(s.asociacion_id, s.niveles) then
+    raise exception 'No tienes permiso para resolver esta solicitud';
+  end if;
+  if s.estado <> 'pendiente' then raise exception 'La solicitud ya estaba resuelta'; end if;
+  d := s.datos;
+  if p_aprobar then
+    if s.tipo = 'familia' then
+      v_emails := array_remove(array[s.email, nullif(d->>'email2', '')], null);
+      if exists (select 1 from accesos_permitidos where email = any(v_emails) and asociacion_id <> s.asociacion_id) then
+        raise exception 'Un correo de la solicitud ya pertenece a otra asociación';
+      end if;
+      insert into familias(asociacion_id, emails, nombre_padre, nombre_madre, correo_padre, correo_madre,
+                           movil_padre, movil_madre, direccion)
+      values (s.asociacion_id, v_emails, nullif(d->>'nombre_padre', ''), nullif(d->>'nombre_madre', ''),
+              nullif(d->>'correo_padre', ''), nullif(d->>'correo_madre', ''),
+              nullif(d->>'movil_padre', ''), nullif(d->>'movil_madre', ''), nullif(d->>'direccion', ''));
+      insert into accesos_permitidos(email, asociacion_id, rol, anadido_por)
+        select e, s.asociacion_id, 'familia', auth.uid() from unnest(v_emails) e
+        on conflict (email) do nothing;
+    elsif s.tipo = 'socio' then
+      select * into v_fam from familias where asociacion_id = s.asociacion_id and s.email = any(emails);
+      insert into socios(asociacion_id, nombre, apellidos, fecha_nacimiento, nivel, nombre_padre, nombre_madre,
+                         alergias, direccion, correo_padre, correo_madre, correo_socio, movil_padre, movil_madre)
+      values (s.asociacion_id, d->>'nombre', d->>'apellidos', nullif(d->>'fecha_nacimiento', '')::date, d->>'nivel',
+              v_fam.nombre_padre, v_fam.nombre_madre, nullif(d->>'alergias', ''), v_fam.direccion,
+              v_fam.correo_padre, v_fam.correo_madre, nullif(d->>'correo_socio', ''),
+              v_fam.movil_padre, v_fam.movil_madre)
+      returning id into v_socio;
+      insert into periodos_alta(socio_id, fecha_alta) values (v_socio, current_date);
+      insert into familiares_socios(email, socio_id)
+        select e, v_socio from unnest(coalesce(v_fam.emails, array[s.email])) e;
+    else
+      update periodos_alta set fecha_baja = current_date, motivo_baja = nullif(d->>'motivo', '')
+        where socio_id = s.socio_id and fecha_baja is null;
+    end if;
+  end if;
+  update solicitudes_alta
+    set estado = case when p_aprobar then 'aprobada' else 'rechazada' end,
+        motivo_resolucion = left(p_motivo, 300), resuelta_por = auth.uid(), resuelta_en = now()
+    where id = p_id;
+end $$;
+
+alter table enlaces_alta        enable row level security;
+alter table familias            enable row level security;
+alter table permisos_aprobacion enable row level security;
+alter table solicitudes_alta    enable row level security;
+
+-- Solo el encargado gestiona enlaces y permisos de aprobación (cada preceptor ve el suyo).
+-- Las solicitudes solo se crean y resuelven con las funciones de arriba: no hay políticas de escritura.
+create policy ea_enc on enlaces_alta for all
+  using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
+create policy fa_ver on familias for select
+  using (rol_en(asociacion_id) = 'encargado' or email_actual() = any(emails));
+create policy pap_ver on permisos_aprobacion for select
+  using (rol_en(asociacion_id) = 'encargado' or email = email_actual());
+create policy pap_enc on permisos_aprobacion for all
+  using (rol_en(asociacion_id) = 'encargado') with check (rol_en(asociacion_id) = 'encargado');
+create policy sa_ver on solicitudes_alta for select
+  using (puede_aprobar(asociacion_id, niveles) or email = email_actual());
+
