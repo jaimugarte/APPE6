@@ -168,6 +168,28 @@ export function serieAsistencia(registros, socios, tipo, desdeIso, hastaIso) {
   return out
 }
 
+// Asistencia por mes natural de una actividad (en números absolutos):
+//  - distintos: socios distintos que asistieron al menos una vez en el mes
+//  - media: asistentes por semana, de media (solo actividades semanales; null en el resto)
+// Cada periodo cuenta en el mes en que empieza (las semanas, por su lunes).
+export function serieAsistenciaMensual(registros, socios, tipo, desdeIso, hastaIso) {
+  const meses = new Map()
+  const [dy, dm] = desdeIso.split('-').map(Number)
+  const [hy, hm] = hastaIso.split('-').map(Number)
+  for (let y = dy, m = dm; y < hy || (y === hy && m <= hm); m === 12 ? (y++, m = 1) : m++) meses.set(`${y}-${p2(m)}`, [])
+  recorrer(registros, socios, [tipo], desdeIso, hastaIso, (t, inicio, part) => {
+    const asist = [...part].filter(([, v]) => v).map(([id]) => id)
+    meses.get(inicio.slice(0, 7))?.push(asist)
+  })
+  const semanal = tipo.periodicidad === 'semanal'
+  return [...meses].map(([ym, periodos]) => {
+    const distintos = new Set(periodos.flat()).size
+    const media = semanal && periodos.length
+      ? Math.round((10 * periodos.reduce((a, l) => a + l.length, 0)) / periodos.length) / 10 : null
+    return { mes: ym, etiqueta: etiquetaMes(ym), distintos, media, semanas: periodos.length }
+  })
+}
+
 // Asistencia media (%) por nivel y actividad en un rango de fechas
 export function matrizNivelActividad(registros, socios, tipos, desdeIso, hastaIso) {
   const nivelDe = new Map(socios.map(s => [s.id, s.nivel || 'Sin nivel']))

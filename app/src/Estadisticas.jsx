@@ -23,6 +23,7 @@ export default function Estadisticas({ asoc, rol }) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
   const [tipoId, setTipoId] = useState(null)
+  const [modoMensual, setModoMensual] = useState('distintos') // 'distintos' | 'media'
   const H = useMemo(() => hoy(), [])
 
   // Un preceptor necesita permiso de «ver» sobre Estadísticas; las familias no tienen acceso
@@ -68,6 +69,9 @@ export default function Estadisticas({ asoc, rol }) {
   const asis = useMemo(() => datos && tipo
     ? calc.serieAsistencia(datos.registros, datos.socios, tipo, desdeRango, H) : null,
     [datos, tipo, desdeRango, H])
+  const asisMes = useMemo(() => datos && tipo
+    ? calc.serieAsistenciaMensual(datos.registros, datos.socios, tipo, desdeRango, H) : null,
+    [datos, tipo, desdeRango, H])
   const mapa = useMemo(() => datos && calc.matrizNivelActividad(datos.registros, datos.socios, datos.tipos, desdeRango, H),
     [datos, desdeRango, H])
   const media = useMemo(() => datos && calc.asistenciaMedia(datos.registros, datos.socios, datos.tipos, desdeRango, H),
@@ -77,6 +81,8 @@ export default function Estadisticas({ asoc, rol }) {
   const oActivos = useMemo(() => serie && op.opcionActivos(serie), [serie])
   const oAltas = useMemo(() => serie && op.opcionAltasBajas(serie), [serie])
   const oAsis = useMemo(() => asis && op.opcionAsistencia(asis), [asis])
+  const modoEf = modoMensual === 'media' && tipo?.periodicidad !== 'semanal' ? 'distintos' : modoMensual
+  const oAsisMes = useMemo(() => asisMes && op.opcionAsistenciaMensual(asisMes, modoEf), [asisMes, modoEf])
   const oMapa = useMemo(() => (mapa?.celdas.length ? op.opcionMapaCalor(mapa) : null), [mapa])
   const oNiveles = useMemo(() => (niveles?.length ? op.opcionNiveles(niveles) : null), [niveles])
   const oEdades = useMemo(() => (edades?.filas.length ? op.opcionEdades(edades.filas) : null), [edades])
@@ -121,8 +127,8 @@ export default function Estadisticas({ asoc, rol }) {
         <Grafico option={oAltas} etiqueta="Altas y bajas por mes" />
       </Tarjeta>
 
-      <Tarjeta titulo="Asistencia por actividad"
-        subtitulo={tipo ? `${tipo.nombre}: % de socios que asistieron en cada periodo` : '% de socios que asistieron en cada periodo'}
+      <Tarjeta titulo="Asistencia semanal"
+        subtitulo={tipo ? `${tipo.nombre}: socios que asistieron en cada ${{ semanal: 'semana', mensual: 'mes', trimestral: 'trimestre', anual: 'año' }[tipo.periodicidad]}` : 'Socios que asistieron en cada periodo'}
         extra={datos.tipos.length > 0 && (
           <div className="chips tipos">
             {datos.tipos.map(t => (
@@ -137,6 +143,25 @@ export default function Estadisticas({ asoc, rol }) {
           filas: asis.map(s => [s.etiqueta, s.si, s.total, s.pct == null ? '—' : `${s.pct}%`]) }}>
         {asis
           ? <Grafico option={oAsis} etiqueta={`Asistencia a ${tipo.nombre}`} />
+          : <p className="aviso">No hay actividades activas.</p>}
+      </Tarjeta>
+
+      <Tarjeta titulo="Asistencia mensual"
+        subtitulo={tipo ? `${tipo.nombre}: ${modoEf === 'media' ? 'asistentes por semana, de media' : 'socios distintos que asistieron en el mes'}` : 'Por mes'}
+        extra={asisMes && (
+          <div className="seg" role="group" aria-label="Qué mostrar">
+            <button className={modoEf === 'distintos' ? 'on' : ''} aria-pressed={modoEf === 'distintos'}
+              title="Socios distintos que asistieron al menos una vez en el mes" onClick={() => setModoMensual('distintos')}>Distintos</button>
+            <button className={modoEf === 'media' ? 'on' : ''} aria-pressed={modoEf === 'media'}
+              disabled={tipo.periodicidad !== 'semanal'}
+              title={tipo.periodicidad === 'semanal' ? 'Asistentes por semana, de media, en el mes' : 'Solo para actividades semanales'}
+              onClick={() => setModoMensual('media')}>Media/sem.</button>
+          </div>
+        )}
+        tabla={asisMes && { cab: ['Mes', 'Distintos', ...(tipo.periodicidad === 'semanal' ? ['Media/sem.'] : [])],
+          filas: asisMes.map(s => [s.etiqueta, s.distintos, ...(tipo.periodicidad === 'semanal' ? [s.media ?? '—'] : [])]) }}>
+        {asisMes
+          ? <Grafico option={oAsisMes} etiqueta={`Asistencia mensual a ${tipo.nombre}`} />
           : <p className="aviso">No hay actividades activas.</p>}
       </Tarjeta>
 

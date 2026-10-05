@@ -102,8 +102,8 @@ export function opcionAsistencia(serie) {
   let ultimo = -1
   serie.forEach((s, i) => { if (s.pct != null) ultimo = i })
   const data = serie.map((s, i) => {
-    const it = { value: s.pct, s }
-    if (i === ultimo) it.label = { show: true, position: 'top', formatter: `${s.pct}%`, color: C.texto, fontWeight: 600 }
+    const it = { value: s.pct == null ? null : s.si, s }
+    if (i === ultimo) it.label = { show: true, position: 'top', formatter: String(s.si), color: C.texto, fontWeight: 600 }
     return it
   })
   return {
@@ -112,10 +112,40 @@ export function opcionAsistencia(serie) {
     tooltip: tip('axis', ps => {
       const s = ps[0]?.data?.s
       if (!s || s.pct == null) return ''
-      return `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}${s.pct}%: ${s.si} de ${s.total} socios`
+      return `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}<b>${s.si}</b> ${s.si === 1 ? 'socio asistió' : 'socios asistieron'} de ${s.total}`
     }, 'shadow'),
     xAxis: ejeX(serie.map(s => s.etiqueta)),
-    yAxis: ejeY({ min: 0, max: 100, interval: 25, axisLabel: { color: C.mudo, formatter: '{value}%' } }),
+    yAxis: ejeY({ min: 0, minInterval: 1 }),
+    series: [{
+      type: 'bar', data, barMaxWidth: 24, barCategoryGap: '30%',
+      itemStyle: { color: C.s1, borderRadius: [4, 4, 0, 0] }, label: { show: false }
+    }]
+  }
+}
+
+// Asistencia mensual en números absolutos: socios distintos en el mes, o asistentes por semana de media
+export function opcionAsistenciaMensual(serie, modo) {
+  const campo = modo === 'media' ? 'media' : 'distintos'
+  let ultimo = -1
+  serie.forEach((s, i) => { if (s[campo] != null) ultimo = i })
+  const data = serie.map((s, i) => {
+    const it = { value: s[campo], s }
+    if (i === ultimo) it.label = { show: true, position: 'top', formatter: String(s[campo]), color: C.texto, fontWeight: 600 }
+    return it
+  })
+  return {
+    ...base(),
+    grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
+    tooltip: tip('axis', ps => {
+      const s = ps[0]?.data?.s
+      if (!s || s[campo] == null) return ''
+      const txt = modo === 'media'
+        ? `<b>${s.media}</b> asistentes por semana de media (${s.semanas} ${s.semanas === 1 ? 'semana' : 'semanas'})`
+        : `<b>${s.distintos}</b> ${s.distintos === 1 ? 'socio distinto' : 'socios distintos'}`
+      return `<b>${esc(ps[0].name)}</b><br/>${punto(C.s1)}${txt}`
+    }, 'shadow'),
+    xAxis: ejeX(serie.map(s => s.etiqueta)),
+    yAxis: ejeY({ min: 0, ...(modo === 'media' ? {} : { minInterval: 1 }) }),
     series: [{
       type: 'bar', data, barMaxWidth: 24, barCategoryGap: '30%',
       itemStyle: { color: C.s1, borderRadius: [4, 4, 0, 0] }, label: { show: false }
