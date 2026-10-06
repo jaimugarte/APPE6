@@ -412,3 +412,8 @@ input.importe { width: 84px; min-height: 40px; text-align: right; }
 .participante input.importe { width: 84px; min-height: 40px; text-align: right; }
 .lista-candidatos { max-height: 360px; overflow: auto; }
 .campos h3 { font-size: 1rem; margin: 16px 0 6px; }
+
+/* Herramientas */
+.acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--linea-fuerte); border-radius: 12px; background: var(--superficie); color: var(--acento); text-decoration: none; font-weight: 600; }
+.check-fila small { color: var(--tinta-2); }

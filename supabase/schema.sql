@@ -1032,3 +1032,25 @@ begin
   return v_id;
 end $$;
 
+
+-- ---------- HERRAMIENTAS ----------
+-- Utilidades para el equipo (de momento: generar postales). Acceso: encargado y todos los preceptores; las familias no.
+insert into apps(clave, nombre, descripcion) values
+  ('herramientas', 'Herramientas', 'Utilidades para el equipo: postales y más')
+  on conflict (clave) do nothing;
+
+create or replace function es_equipo_app(p_asoc uuid, p_app text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(rol_en(p_asoc) in ('encargado', 'preceptor'), false)
+     and exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = p_app and activa) $$;
+
+-- Datos mínimos para las etiquetas de postales: socios de alta con su dirección y correos de los padres (para agrupar hermanos)
+create or replace function direcciones_postales()
+returns table(id uuid, nombre text, apellidos text, nivel text, direccion text, correo_padre text, correo_madre text)
+language sql stable security definer set search_path = public as $$
+  select s.id, s.nombre, s.apellidos, s.nivel, s.direccion, s.correo_padre, s.correo_madre
+  from socios s
+  where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
+    and es_equipo_app(s.asociacion_id, 'herramientas')
+    and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+  order by s.apellidos, s.nombre $$;

@@ -119,3 +119,15 @@ App `campos_trabajo` para el equipo: **todos los preceptores tienen acceso** (no
 - **Retirar dinero**: se elige una **Convivencia o Curso de Retiro** disponible para ese socio (de su nivel o para todos, y que no acabara hace más de 90 días); no se puede retirar más que el disponible. Solo el encargado puede anular una retirada.
 - Salvaguardas en la base de datos: nadie puede quedar con saldo negativo (no se baja lo ganado ni se borra un campo del que ya se retiró dinero).
 - **Nombre de los preceptores**: lo escribe el encargado en Ajustes → Cuentas con acceso; es el que se ve como responsable.
+
+## Herramientas (postales)
+
+App `herramientas` para el equipo: **encargado y todos los preceptores** tienen acceso (no aparece en los permisos de Ajustes); las familias no la ven. El administrador global la concede y el encargado la activa como las demás.
+
+**Generar postales**: se eligen los cursos, se ven las familias con algún hijo de alta en esos cursos (con casillas para quitar alguna) y se genera un **PDF** con una etiqueta por familia: «Familia González Pérez» en negrita y debajo la dirección. Los hermanos se agrupan por correo de los padres o por mismos apellidos y dirección. Las familias sin dirección no salen y se avisa de ellas.
+
+- Formatos de pegatinas A4: 24 (63,5×33,9), 21 (63,5×38,1), 14 (99,1×38,1) y 8 (99,1×67,7) por hoja.
+- «Empezar en la etiqueta nº» sirve para aprovechar una hoja ya empezada. «Dibujar el contorno» permite probar en papel normal. Imprime al 100 %.
+- Solo Latin-1: caracteres fuera de él (p. ej. «ł») salen como «?».
+- Privacidad: todos los preceptores ven las direcciones de las familias de **todos** los cursos (la función `direcciones_postales()` no filtra por nivel).
+- Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql`.

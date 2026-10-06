@@ -69,6 +69,7 @@ export function crearBD() {
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
       { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },
       { clave: 'campos_trabajo', nombre: 'Campos de trabajo', descripcion: 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro' },
+      { clave: 'herramientas', nombre: 'Herramientas', descripcion: 'Utilidades para el equipo: postales y más' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -78,6 +79,7 @@ export function crearBD() {
       { asociacion_id: ASOC, app_clave: 'estadisticas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'campos_trabajo', permitida: true, activa: true },
+      { asociacion_id: ASOC, app_clave: 'herramientas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
     ],
     accesos_permitidos: [

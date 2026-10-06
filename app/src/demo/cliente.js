@@ -374,6 +374,13 @@ export function crearClienteDemo() {
         return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
           activo: db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja) })).sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
       }
+      if (nombre === 'direcciones_postales') {
+        if (!u || !(u.rol === 'encargado' || u.rol === 'preceptor') || !appActiva(u, 'herramientas')) return { data: [], error: null }
+        return { data: db.socios.filter(x => x.asociacion_id === u.asoc && db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja))
+          .map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel, direccion: x.direccion ?? null,
+            correo_padre: x.correo_padre ?? null, correo_madre: x.correo_madre ?? null }))
+          .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
+      }
       if (nombre === 'lista_preceptores') {
         if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
         return { data: db.accesos_permitidos.filter(x => x.asociacion_id === u.asoc && x.rol === 'preceptor').map(x => ({ email: x.email, nombre: x.nombre ?? null })), error: null }
