@@ -110,15 +110,9 @@ Desde 2º ESO la ficha muestra «Asiste a círculos» y «Es catequista» (por d
 - **Eventos**: lo que antes eran «actividades» de asistencia (Charla, Círculo, Visita de pobres, Retiro mensual, Curso de retiro, Preceptuación, Sacerdote, Conversación con los padres…). Se eligen en Ajustes y se marcan en Asistencia.
 - **Actividades**: lo que antes eran «planes» (calendario). Tipo: Plan, Convivencia o Curso de Retiro.
 
-## Campos de trabajo
+## Trabajos (antes «Campos de trabajo»)
 
-App `campos_trabajo` para el equipo: **todos los preceptores tienen acceso** (no aparece en los permisos de Ajustes) además del encargado; las familias no la ven. El administrador global la concede y el encargado la activa como las demás.
-
-- **Campos**: «+ Nuevo campo de trabajo» (nombre, fecha, descripción, responsable —un preceptor— y socios). La cantidad ganada se asigna **por socio** («Dar a todos») o como **total a repartir** a partes iguales (sin perder céntimos), y después se puede cambiar socio a socio. Los preceptores ven todos los socios aquí (solo nombre y curso), no únicamente los de su nivel.
-- **Resumen por socio**: lista con curso y **disponible** (ganado − retirado). Al tocar un socio se ve el detalle de sus campos y sus retiradas.
-- **Retirar dinero**: se elige una **Convivencia o Curso de Retiro** disponible para ese socio (de su nivel o para todos, y que no acabara hace más de 90 días); no se puede retirar más que el disponible. Solo el encargado puede anular una retirada.
-- Salvaguardas en la base de datos: nadie puede quedar con saldo negativo (no se baja lo ganado ni se borra un campo del que ya se retiró dinero).
-- **Nombre de los preceptores**: lo escribe el encargado en Ajustes → Cuentas con acceso; es el que se ve como responsable.
+Ya no es una app aparte: es la pestaña **Trabajos** de la app **Dineros**. Un «trabajo» es un evento que consigue la asociación para que los socios ganen dinero (vendimia, mercadillo…). Se crea con su fecha, responsable (un preceptor) y los socios con lo que ha ganado cada uno (o un total a repartir). Desde el detalle de un socio se puede **retirar** dinero para una convivencia o curso de retiro. En la base de datos las tablas siguen llamándose `campos_trabajo`, `campo_participantes` y `retiradas_campo`. Se activa con «Dineros» y tiene el mismo acceso (encargado y todos los preceptores).
 
 ## Herramientas (postales)
 
@@ -137,7 +131,8 @@ App `herramientas` para el equipo: **encargado y todos los preceptores** tienen 
 
 Saldo de cada socio por meriendas, cenas, planes, convivencias y cursos de retiro (las cuotas van aparte, en su sección).
 
-- **Dineros** (app `dineros`, para el equipo): el encargado y **todos los preceptores** pueden verla y apuntar cargos (el socio debe) o ingresos (a favor), con categoría, concepto, importe y fecha, a un socio o a varios a la vez (por curso, con casillas). Se puede borrar un apunte manual equivocado. No aparece en los permisos de Ajustes.
+- **Dineros** (app `dineros`, para el equipo) tiene tres pestañas: **Saldos**, **Merienda** y **Trabajos**. En Saldos el encargado y **todos los preceptores** pueden apuntar cargos (el socio debe) o ingresos (a favor), con categoría, concepto, importe y fecha, a un socio o a varios a la vez (por curso, con casillas). Se puede borrar un apunte manual equivocado.
+- **Merienda**: un contador (− / +) por cada socio, con precio rápido (0,50 / 1 / 1,50 / 2 €, recuerda el último) y un solo botón «Apuntar»; crea un cargo de categoría merienda por socio. No aparece en los permisos de Ajustes.
 - **Hucha** (en la ficha de cada hijo, para las familias): saldo total y el histórico completo, **solo lectura**. Solo se ve si «Dineros» está activa en la asociación. Las familias no pueden sumar ni restar.
 - **Saldo** = apuntes manuales + ganado en campos de trabajo − retirado de campos de trabajo. «Retirar» de un campo de trabajo para una convivencia o curso baja lo disponible en campos y apunta automáticamente el pago correspondiente, de modo que el saldo total no cambia (primero se apunta el coste de la actividad como cargo). Al anular una retirada desaparece también ese pago.
-- Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql` (añade la dirección completa, la tabla `hucha_movimientos` y las funciones `hucha_saldos`, `hucha_historial`, `socios_dineros`; el administrador global debe conceder la app «Dineros» y el encargado activarla).
+- Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql` (añade la dirección completa, la tabla `hucha_movimientos` y las funciones `hucha_saldos`, `hucha_historial`, `socios_dineros`; la app antigua «Campos de trabajo» se traslada sola a «Dineros» con sus permisos).

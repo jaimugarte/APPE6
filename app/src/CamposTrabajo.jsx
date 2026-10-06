@@ -18,7 +18,7 @@ async function paginar(construir) {
 
 const nombreCompleto = s => `${s.apellidos}, ${s.nombre}`
 
-// Campos de trabajo: dinero que ganan los socios y que luego «retiran» para pagar convivencias o cursos de retiro.
+// Trabajos (antes «campos de trabajo»): eventos con los que los socios ganan dinero; dinero que ganan los socios y que luego «retiran» para pagar convivencias o cursos de retiro.
 // Acceso: encargado y todos los preceptores.
 export default function CamposTrabajo({ asoc, rol, uid }) {
   const esEncargado = rol === 'encargado'
@@ -60,11 +60,11 @@ export default function CamposTrabajo({ asoc, rol, uid }) {
   return (
     <main className="campos">
       <div className="barra">
-        <h2>Campos de trabajo</h2>
-        <button className="primario" onClick={() => setVista({ campo: 'nuevo' })}>+ Nuevo campo de trabajo</button>
+        <h2>Trabajos</h2>
+        <button className="primario" onClick={() => setVista({ campo: 'nuevo' })}>+ Nuevo trabajo</button>
       </div>
       <div className="seg" role="group" aria-label="Vista">
-        <button className={vista === 'campos' ? 'on' : ''} aria-pressed={vista === 'campos'} onClick={() => setVista('campos')}>Campos</button>
+        <button className={vista === 'campos' ? 'on' : ''} aria-pressed={vista === 'campos'} onClick={() => setVista('campos')}>Trabajos</button>
         <button className={vista === 'resumen' ? 'on' : ''} aria-pressed={vista === 'resumen'} onClick={() => setVista('resumen')}>Resumen por socio</button>
       </div>
 
@@ -75,7 +75,7 @@ export default function CamposTrabajo({ asoc, rol, uid }) {
 }
 
 function ListaCampos({ datos, nombrePre, onAbrir }) {
-  if (datos.campos.length === 0) return <p className="aviso">Todavía no hay campos de trabajo. Crea el primero con «+ Nuevo campo de trabajo».</p>
+  if (datos.campos.length === 0) return <p className="aviso">Todavía no hay trabajos. Crea el primero con «+ Nuevo trabajo».</p>
   return datos.campos.map(c => {
     const ps = datos.participantes.filter(p => p.campo_id === c.id)
     const total = ps.reduce((a, p) => a + Number(p.importe), 0)
@@ -173,8 +173,8 @@ function DetalleSocio({ fila, datos, esEncargado, onVolver, onCambio }) {
       {retirando && <FormRetirada fila={fila} onCancelar={() => setRetirando(false)} onHecho={async () => { setRetirando(false); await onCambio() }} />}
 
       <section>
-        <h2>Campos de trabajo</h2>
-        {campos.length === 0 && <p className="aviso">Todavía no ha participado en ningún campo.</p>}
+        <h2>Trabajos</h2>
+        {campos.length === 0 && <p className="aviso">Todavía no ha participado en ningún trabajo.</p>}
         {campos.map(p => (
           <div key={p.campo_id} className="fila-dato"><span>{p.campo.nombre} <small>{fecha(p.campo.fecha)}</small></span><b>{eur(p.importe)}</b></div>
         ))}
@@ -297,7 +297,7 @@ function FormCampo({ id, datos, asoc, uid, esEncargado, onVolver, onCambio }) {
 
   const guardar = async () => {
     setMsg('')
-    if (!f.nombre.trim()) return setMsg('Escribe el nombre del campo de trabajo.')
+    if (!f.nombre.trim()) return setMsg('Escribe el nombre del trabajo.')
     if (!f.fecha) return setMsg('Elige la fecha.')
     const importes = filas.map(r => leerImporte(r.importe))
     if (importes.some(v => v == null)) return setMsg('Hay un importe que no es válido (usa números como 12 o 12,50).')
@@ -340,7 +340,7 @@ function FormCampo({ id, datos, asoc, uid, esEncargado, onVolver, onCambio }) {
     <main className="campos">
       <div className="barra">
         <button onClick={onVolver}>← Volver</button>
-        <h2>{nuevo ? 'Nuevo campo de trabajo' : 'Editar campo de trabajo'}</h2>
+        <h2>{nuevo ? 'Nuevo trabajo' : 'Editar trabajo'}</h2>
       </div>
 
       <section>
@@ -373,7 +373,7 @@ function FormCampo({ id, datos, asoc, uid, esEncargado, onVolver, onCambio }) {
           <small className="aviso">También puedes cambiar después la cantidad de cada socio, una a una.</small>
         </div>
 
-        {filas.length === 0 && <p className="aviso">Todavía no hay socios en este campo. Añádelos abajo.</p>}
+        {filas.length === 0 && <p className="aviso">Todavía no hay socios en este trabajo. Añádelos abajo.</p>}
         {filas.map(r => {
           const s = socio(r.socio_id)
           return (
@@ -412,9 +412,9 @@ function FormCampo({ id, datos, asoc, uid, esEncargado, onVolver, onCambio }) {
 
       {msg && <p className="error">{msg}</p>}
       <div className="fila">
-        <button className="primario" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : nuevo ? 'Crear campo de trabajo' : 'Guardar'}</button>
+        <button className="primario" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : nuevo ? 'Crear trabajo' : 'Guardar'}</button>
         {!nuevo && !borrar && <button className="peligro" onClick={() => setBorrar(true)}>Eliminar</button>}
-        {!nuevo && borrar && <button className="peligro" onClick={eliminar}>Sí, eliminar el campo</button>}
+        {!nuevo && borrar && <button className="peligro" onClick={eliminar}>Sí, eliminar el trabajo</button>}
       </div>
     </main>
   )

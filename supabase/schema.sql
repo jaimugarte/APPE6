@@ -39,7 +39,6 @@ insert into apps(clave, nombre, descripcion) values
   ('asistencia',   'Asistencia',   'Registro de asistencia a eventos'),
   ('estadisticas', 'Estadísticas', 'Gráficos y paneles'),
   ('actividades',  'Actividades',  'Calendario de actividades de la asociación'),
-  ('campos_trabajo', 'Campos de trabajo', 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro'),
   ('anuncios',     'Anuncios',     'Avisos y comunicados (futuro)'),
   ('fotos',        'Fotos',        'Galería de actividades (futuro)');
 
@@ -902,11 +901,12 @@ create policy pl_del on planes for delete using (puede_plan(asociacion_id, nivel
 -- ---------- CAMPOS DE TRABAJO ----------
 -- Dinero que ganan los socios en campos de trabajo y que luego «retiran» para pagar convivencias o cursos de retiro.
 -- Acceso: encargado y todos los preceptores (no pasa por permisos_preceptor); las familias no.
+-- Los «trabajos» (campos_trabajo en la base de datos) forman parte de la app «Dineros»: se activan con ella.
 
 create or replace function es_equipo(p_asoc uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(rol_en(p_asoc) in ('encargado', 'preceptor'), false)
-     and exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = 'campos_trabajo' and activa) $$;
+     and exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = 'dineros' and activa) $$;
 
 create or replace function asoc_de_socio(p_socio uuid) returns uuid
 language sql stable security definer set search_path = public as $$ select asociacion_id from socios where id = p_socio $$;
@@ -1122,11 +1122,11 @@ language sql stable security definer set search_path = public as $$
            case when m.retirada_id is null then 'manual' else 'retirada' end as origen, m.creado_en
       from hucha_movimientos m where m.socio_id = p_socio
     union all
-    select null::uuid, c.fecha, 'Campo de trabajo: ' || c.nombre, 'campo_trabajo', cp.importe, 'campo', c.creado_en
+    select null::uuid, c.fecha, 'Trabajo: ' || c.nombre, 'campo_trabajo', cp.importe, 'campo', c.creado_en
       from campo_participantes cp join campos_trabajo c on c.id = cp.campo_id
       where cp.socio_id = p_socio and cp.importe > 0
     union all
-    select null::uuid, r.fecha, 'Retirada de campos de trabajo: ' || r.actividad_titulo, 'campo_retirada', -r.importe, 'campo', r.creado_en
+    select null::uuid, r.fecha, 'Retirada de trabajos: ' || r.actividad_titulo, 'campo_retirada', -r.importe, 'campo', r.creado_en
       from retiradas_campo r where r.socio_id = p_socio
   ) x
   where puede_ver_hucha(p_socio)
@@ -1148,7 +1148,7 @@ begin
     returning retiradas_campo.id into v_id;
   insert into hucha_movimientos(asociacion_id, socio_id, categoria, concepto, importe, retirada_id)
     values (s.asociacion_id, p_socio, case when a.tipo = 'curso_retiro' then 'curso_retiro' else 'convivencia' end,
-            left('Pagado con campos de trabajo: ' || a.titulo, 120), round(p_importe, 2), v_id);
+            left('Pagado con trabajos: ' || a.titulo, 120), round(p_importe, 2), v_id);
   return v_id;
 end $$;
 

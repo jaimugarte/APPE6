@@ -58,14 +58,11 @@ alter table planes add column if not exists tipo text not null default 'plan' ch
 -- Dinero que ganan los socios en campos de trabajo y que luego «retiran» para pagar convivencias o cursos de retiro.
 -- Acceso: encargado y todos los preceptores (no pasa por permisos_preceptor); las familias no.
 alter table accesos_permitidos add column if not exists nombre text check (char_length(nombre) <= 80);  -- nombre del preceptor, lo pone el encargado
-insert into apps(clave, nombre, descripcion) values
-  ('campos_trabajo', 'Campos de trabajo', 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro')
-  on conflict (clave) do nothing;
 
 create or replace function es_equipo(p_asoc uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(rol_en(p_asoc) in ('encargado', 'preceptor'), false)
-     and exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = 'campos_trabajo' and activa) $$;
+     and exists (select 1 from asociacion_apps where asociacion_id = p_asoc and app_clave = 'dineros' and activa) $$;
 
 create or replace function asoc_de_socio(p_socio uuid) returns uuid
 language sql stable security definer set search_path = public as $$ select asociacion_id from socios where id = p_socio $$;
@@ -421,11 +418,11 @@ language sql stable security definer set search_path = public as $$
            case when m.retirada_id is null then 'manual' else 'retirada' end as origen, m.creado_en
       from hucha_movimientos m where m.socio_id = p_socio
     union all
-    select null::uuid, c.fecha, 'Campo de trabajo: ' || c.nombre, 'campo_trabajo', cp.importe, 'campo', c.creado_en
+    select null::uuid, c.fecha, 'Trabajo: ' || c.nombre, 'campo_trabajo', cp.importe, 'campo', c.creado_en
       from campo_participantes cp join campos_trabajo c on c.id = cp.campo_id
       where cp.socio_id = p_socio and cp.importe > 0
     union all
-    select null::uuid, r.fecha, 'Retirada de campos de trabajo: ' || r.actividad_titulo, 'campo_retirada', -r.importe, 'campo', r.creado_en
+    select null::uuid, r.fecha, 'Retirada de trabajos: ' || r.actividad_titulo, 'campo_retirada', -r.importe, 'campo', r.creado_en
       from retiradas_campo r where r.socio_id = p_socio
   ) x
   where puede_ver_hucha(p_socio)
@@ -447,7 +444,7 @@ begin
     returning retiradas_campo.id into v_id;
   insert into hucha_movimientos(asociacion_id, socio_id, categoria, concepto, importe, retirada_id)
     values (s.asociacion_id, p_socio, case when a.tipo = 'curso_retiro' then 'curso_retiro' else 'convivencia' end,
-            left('Pagado con campos de trabajo: ' || a.titulo, 120), round(p_importe, 2), v_id);
+            left('Pagado con trabajos: ' || a.titulo, 120), round(p_importe, 2), v_id);
   return v_id;
 end $$;
 
@@ -462,3 +459,11 @@ language sql stable security definer set search_path = public as $$
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo_app(s.asociacion_id, 'dineros')
   order by s.apellidos, s.nombre $$;
+
+-- «Campos de trabajo» pasa a ser una pestaña («Trabajos») de la app «Dineros»: se trasladan los permisos y se retira la app antigua
+insert into asociacion_apps(asociacion_id, app_clave, permitida, activa)
+select asociacion_id, 'dineros', permitida, activa from asociacion_apps where app_clave = 'campos_trabajo'
+on conflict (asociacion_id, app_clave) do update
+  set permitida = asociacion_apps.permitida or excluded.permitida, activa = asociacion_apps.activa or excluded.activa;
+delete from asociacion_apps where app_clave = 'campos_trabajo';
+delete from apps where clave = 'campos_trabajo';

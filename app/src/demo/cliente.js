@@ -90,7 +90,7 @@ export function crearClienteDemo() {
   }
 
   // Campos de trabajo: encargado y todos los preceptores (sin pasar por permisos), si la app está activa
-  const esEquipo = (u, asoc) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, 'campos_trabajo')
+  const esEquipo = (u, asoc) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, 'dineros')
   const campoDe = id => db.campos_trabajo.find(c => c.id === id)
   const esEquipoApp = (u, asoc, app) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, app)
   const saldoHucha = id => Math.round((db.hucha_movimientos.filter(x => x.socio_id === id).reduce((a, x) => a + Number(x.importe), 0) + saldoCampo(id)) * 100) / 100
@@ -407,8 +407,8 @@ export function crearClienteDemo() {
           ...db.hucha_movimientos.filter(m => m.socio_id === s.id).map(m => ({ id: m.id, fecha: m.fecha, concepto: m.concepto, categoria: m.categoria, importe: Number(m.importe),
             origen: m.retirada_id ? 'retirada' : 'manual', _o: m.creado_en })),
           ...db.campo_participantes.filter(x => x.socio_id === s.id && Number(x.importe) > 0).map(x => { const c = campoDe(x.campo_id)
-            return { id: null, fecha: c.fecha.slice(0, 10), concepto: `Campo de trabajo: ${c.nombre}`, categoria: 'campo_trabajo', importe: Number(x.importe), origen: 'campo', _o: c.creado_en } }),
-          ...db.retiradas_campo.filter(x => x.socio_id === s.id).map(x => ({ id: null, fecha: x.fecha, concepto: `Retirada de campos de trabajo: ${x.actividad_titulo}`,
+            return { id: null, fecha: c.fecha.slice(0, 10), concepto: `Trabajo: ${c.nombre}`, categoria: 'campo_trabajo', importe: Number(x.importe), origen: 'campo', _o: c.creado_en } }),
+          ...db.retiradas_campo.filter(x => x.socio_id === s.id).map(x => ({ id: null, fecha: x.fecha, concepto: `Retirada de trabajos: ${x.actividad_titulo}`,
             categoria: 'campo_retirada', importe: -Number(x.importe), origen: 'campo', _o: x.creado_en }))
         ].sort((p, q) => String(q.fecha).localeCompare(String(p.fecha)) || String(q._o ?? '').localeCompare(String(p._o ?? '')))
         return { data: filas.map(({ _o, ...f }) => f), error: null }
@@ -435,7 +435,7 @@ export function crearClienteDemo() {
         db.retiradas_campo.push({ id, asociacion_id: sc.asociacion_id, socio_id: sc.id, actividad_id: act.id, actividad_titulo: act.titulo,
           importe: Math.round(imp * 100) / 100, fecha: hoyIso, nota: String(a.p_nota ?? '').trim().slice(0, 300) || null, creado_por: u.id, creado_en: hoyIso })
         db.hucha_movimientos.push({ id: uuid(), asociacion_id: sc.asociacion_id, socio_id: sc.id, fecha: hoyIso, categoria: act.tipo === 'curso_retiro' ? 'curso_retiro' : 'convivencia',
-          concepto: `Pagado con campos de trabajo: ${act.titulo}`.slice(0, 120), importe: Math.round(imp * 100) / 100, retirada_id: id, creado_por: u.id, creado_en: hoyIso })
+          concepto: `Pagado con trabajos: ${act.titulo}`.slice(0, 120), importe: Math.round(imp * 100) / 100, retirada_id: id, creado_por: u.id, creado_en: hoyIso })
         return { data: id, error: null }
       }
       if (nombre === 'info_enlace') return { data: enlaceVigente(a.p_token) ? db.asociaciones.find(x => x.id === enlaceVigente(a.p_token).asociacion_id).nombre : null, error: null }

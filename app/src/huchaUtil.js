@@ -2,7 +2,7 @@
 export const CATEGORIAS = [
   ['merienda', 'Merienda'], ['cena', 'Cena'], ['plan', 'Plan'], ['convivencia', 'Convivencia'], ['curso_retiro', 'Curso de retiro'], ['otro', 'Otro']
 ]
-const ETIQ = Object.fromEntries([...CATEGORIAS, ['campo_trabajo', 'Campo de trabajo'], ['campo_retirada', 'Campos de trabajo']])
+const ETIQ = Object.fromEntries([...CATEGORIAS, ['campo_trabajo', 'Trabajo'], ['campo_retirada', 'Retirada de trabajos']])
 export const etiquetaCategoria = c => ETIQ[c] || c
 
 // Texto del movimiento: su concepto o, si no lo tiene, la categoría

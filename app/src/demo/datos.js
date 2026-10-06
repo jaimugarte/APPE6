@@ -68,9 +68,8 @@ export function crearBD() {
       { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a eventos' },
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
       { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },
-      { clave: 'campos_trabajo', nombre: 'Campos de trabajo', descripcion: 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro' },
       { clave: 'herramientas', nombre: 'Herramientas', descripcion: 'Utilidades para el equipo: postales y más' },
-      { clave: 'dineros', nombre: 'Dineros', descripcion: 'Saldo de cada socio: deudas y ahorros (meriendas, cenas, planes, convivencias)' },
+      { clave: 'dineros', nombre: 'Dineros', descripcion: 'Saldos de los socios: meriendas, deudas y ahorros, y trabajos para ganar dinero' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -79,7 +78,6 @@ export function crearBD() {
       { asociacion_id: ASOC, app_clave: 'asistencia', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'estadisticas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
-      { asociacion_id: ASOC, app_clave: 'campos_trabajo', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'herramientas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'dineros', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
@@ -211,7 +209,7 @@ export function crearBD() {
   if (conRetiro) db.retiradas_campo.push({ id: 'rc-1', asociacion_id: ASOC, socio_id: conRetiro.socio_id, actividad_id: 'pl-6',
     actividad_titulo: 'Curso de retiro de otoño', importe: 30, fecha: H, nota: null, creado_por: 'u-enc', creado_en: H })
   if (conRetiro) db.hucha_movimientos.push({ id: 'hm-r1', asociacion_id: ASOC, socio_id: conRetiro.socio_id, fecha: H, categoria: 'curso_retiro',
-    concepto: 'Pagado con campos de trabajo: Curso de retiro de otoño', importe: 30, retirada_id: 'rc-1', creado_por: 'u-enc', creado_en: H })
+    concepto: 'Pagado con trabajos: Curso de retiro de otoño', importe: 30, retirada_id: 'rc-1', creado_por: 'u-enc', creado_en: H })
   db.socios_bancarios.push({ socio_id: 's-1', iban: 'ES9121000418450200051332' })
 
   // Dos hermanos vinculados a la cuenta de familia de ejemplo

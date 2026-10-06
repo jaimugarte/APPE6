@@ -430,3 +430,14 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .hucha-socios { display: grid; gap: 6px; margin-top: 8px; }
 .hucha-fila { display: flex; align-items: center; gap: 10px; } .hucha-fila .item { flex: 1; }
 .hucha-fila input[type=checkbox] { width: 20px; height: 20px; flex: none; }
+
+/* Pestañas de Dineros y contador de meriendas */
+.pestanas { max-width: 1100px; margin: 0 auto; padding: 12px 16px 0; }
+.merienda-lista { display: grid; gap: 6px; margin: 8px 0 90px; }
+.merienda-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 12px; background: var(--superficie); }
+.merienda-fila.con { border-color: var(--acento-borde); background: var(--acento-suave); }
+.merienda-fila > span:first-child { display: grid; min-width: 0; } .merienda-fila small { color: var(--tinta-2); }
+.contador { display: inline-flex; align-items: center; gap: 6px; }
+.contador button { width: 46px; height: 46px; min-height: 0; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
+.contador output { min-width: 28px; text-align: center; font-weight: 700; font-size: 1.15rem; }
+.merienda-barra { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; padding: 12px 16px; margin: 0 -16px; background: var(--superficie); border-top: 1px solid var(--linea); }

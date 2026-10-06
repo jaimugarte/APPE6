@@ -11,7 +11,6 @@ import Solicitudes from './Solicitudes'
 import FamiliaHijos from './FamiliaHijos'
 import FamiliaCuotas from './FamiliaCuotas'
 import Actividades from './Actividades'
-import CamposTrabajo from './CamposTrabajo'
 import Herramientas from './Herramientas'
 import Dineros from './Dineros'
 import HubFamilia from './HubFamilia'
@@ -124,10 +123,10 @@ export default function App() {
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
   // Las familias nunca ven Asistencia ni Estadísticas; sí el resto de apps (socios, anuncios, fotos…)
-  const SOLO_EQUIPO = ['asistencia', 'estadisticas', 'socios', 'campos_trabajo', 'herramientas', 'dineros'] // Socios lo sustituye, para ellas, su pantalla de inicio
+  const SOLO_EQUIPO = ['asistencia', 'estadisticas', 'socios', 'herramientas', 'dineros'] // Socios lo sustituye, para ellas, su pantalla de inicio
   const visible = a => esEncargado
     || (mem?.rol === 'preceptor'
-      ? a.app_clave === 'campos_trabajo' || a.app_clave === 'herramientas' || a.app_clave === 'dineros' || !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver  // Campos de trabajo: todos los preceptores
+      ? a.app_clave === 'herramientas' || a.app_clave === 'dineros' || !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver  // Herramientas y Dineros: todos los preceptores
       : !SOLO_EQUIPO.includes(a.app_clave))
   const activas = apps.filter(a => a.activa && visible(a))
   // Solicitudes no es una app del catálogo: solo quien puede aprobar. Las familias ven el estado en su inicio.
@@ -209,11 +208,9 @@ export default function App() {
         </Suspense>}
       {vista === 'app' && abierta?.app_clave === 'actividades' &&
         <Actividades asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta?.app_clave === 'campos_trabajo' && !esFamilia &&
-        <CamposTrabajo asoc={mem.asociacion_id} rol={mem.rol} uid={session.user.id} />}
       {vista === 'app' && abierta?.app_clave === 'herramientas' && !esFamilia && <Herramientas />}
-      {vista === 'app' && abierta?.app_clave === 'dineros' && !esFamilia && <Dineros asoc={mem.asociacion_id} />}
-      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas', 'actividades', 'campos_trabajo', 'herramientas', 'dineros'].includes(abierta.app_clave) &&
+      {vista === 'app' && abierta?.app_clave === 'dineros' && !esFamilia && <Dineros asoc={mem.asociacion_id} rol={mem.rol} uid={session.user.id} />}
+      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas', 'actividades', 'herramientas', 'dineros'].includes(abierta.app_clave) &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'solicitudes' && conSolicitudes && <Solicitudes onCambio={cargar} />}
       {vista === 'ajustes' && esEncargado &&

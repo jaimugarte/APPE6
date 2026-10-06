@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { NIVELES, hoy } from './util'
 import { HuchaHistorial } from './Hucha'
+import CamposTrabajo from './CamposTrabajo'
 import { CATEGORIAS, eurSigno, claseSaldo, leerImporteHucha } from './huchaUtil'
 
 const nombreCompleto = s => `${s.apellidos}, ${s.nombre}`
@@ -9,7 +10,22 @@ const sinTildes = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowe
 
 // Dineros: saldo de cada socio (meriendas, cenas, planes, convivencias…; sin cuotas). Encargado y todos los preceptores.
 // Las familias ven lo mismo, solo lectura, en la «Hucha» de cada hijo.
-export default function Dineros({ asoc }) {
+export default function Dineros({ asoc, rol, uid }) {
+  const [pestana, setPestana] = useState('socios')   // 'socios' | 'merienda' | 'trabajos'
+  return (
+    <>
+      <div className="pestanas"><div className="seg" role="group" aria-label="Sección">
+        {[['socios', 'Saldos'], ['merienda', 'Merienda'], ['trabajos', 'Trabajos']].map(([k, t]) =>
+          <button key={k} className={pestana === k ? 'on' : ''} aria-pressed={pestana === k} onClick={() => setPestana(k)}>{t}</button>)}
+      </div></div>
+      {pestana === 'socios' && <Saldos asoc={asoc} />}
+      {pestana === 'merienda' && <Merienda asoc={asoc} />}
+      {pestana === 'trabajos' && <CamposTrabajo asoc={asoc} rol={rol} uid={uid} />}
+    </>
+  )
+}
+
+function Saldos({ asoc }) {
   const [socios, setSocios] = useState(null)
   const [error, setError] = useState('')
   const [vista, setVista] = useState('lista')       // 'lista' | {socio: id} | 'varios'
@@ -59,7 +75,7 @@ export default function Dineros({ asoc }) {
   return (
     <main className="campos">
       <div className="barra"><h2>Dineros</h2></div>
-      <p className="nota">Meriendas, cenas, planes, convivencias… (las cuotas van aparte). Negativo = debe; positivo = a favor. Las familias lo ven en la «Hucha» de cada hijo.</p>
+      <p className="nota">Negativo = debe; positivo = a favor (las cuotas van aparte). Las familias lo ven en la «Hucha» de cada hijo. Para las meriendas usa la pestaña «Merienda».</p>
       {aviso && <p className="okmsg">{aviso}</p>}
 
       <div className="filtro-nivel">
@@ -117,7 +133,7 @@ function Detalle({ socio, asoc, onVolver, onCambio }) {
       <section>
         <h2>Movimientos</h2>
         <HuchaHistorial socioId={socio.id} version={version} onBorrar={borrar} />
-        <p className="nota">Se puede borrar un apunte manual que esté mal. Los de campos de trabajo se gestionan en su sección.</p>
+        <p className="nota">Se puede borrar un apunte manual que esté mal. Los de trabajos se gestionan en la pestaña «Trabajos».</p>
       </section>
     </main>
   )
@@ -164,5 +180,86 @@ function FormMovimiento({ asoc, socios, onHecho }) {
       {msg && <p className="error">{msg}</p>}
       <div className="fila"><button className="primario" disabled={enviando}>{enviando ? 'Guardando…' : signo < 0 ? 'Apuntar cargo' : 'Apuntar ingreso'}</button></div>
     </form>
+  )
+}
+
+// Merienda: un contador por socio y un solo botón para apuntar (cada merienda es un cargo de «precio» €)
+const PRECIOS = [0.5, 1, 1.5, 2]
+function Merienda({ asoc }) {
+  const [socios, setSocios] = useState(null)
+  const [error, setError] = useState('')
+  const [niveles, setNiveles] = useState([])
+  const [q, setQ] = useState('')
+  const [cuenta, setCuenta] = useState({})          // socio_id -> nº de meriendas
+  const [precio, setPrecio] = useState(() => { try { return Number(localStorage.getItem('precio_merienda')) || 1 } catch { return 1 } })
+  const [guardando, setGuardando] = useState(false)
+  const [hecho, setHecho] = useState('')
+
+  useEffect(() => {
+    supabase.rpc('socios_dineros').then(({ data, error }) => { if (error) setError(error.message); else setSocios((data || []).filter(s => s.activo)) })
+  }, [])
+  const cambiarPrecio = p => { setPrecio(p); try { localStorage.setItem('precio_merienda', String(p)) } catch { /* sin almacenamiento */ } }
+
+  const todosNiveles = useMemo(() => [...new Set((socios || []).map(s => s.nivel).filter(Boolean))]
+    .sort((a, b) => (NIVELES.indexOf(a) + 1 || 99) - (NIVELES.indexOf(b) + 1 || 99) || a.localeCompare(b, 'es')), [socios])
+  const visibles = useMemo(() => (socios || []).filter(s => (!niveles.length || niveles.includes(s.nivel))
+    && (!q.trim() || sinTildes(nombreCompleto(s)).includes(sinTildes(q.trim())))), [socios, niveles, q])
+
+  if (error) return <main><p className="error">{error}</p></main>
+  if (!socios) return <main><p>Cargando…</p></main>
+
+  const mover = (id, d) => { setHecho(''); setCuenta(c => { const n = Math.max(0, Math.min(20, (c[id] || 0) + d)); const o = { ...c }; if (n) o[id] = n; else delete o[id]; return o }) }
+  const total = Object.values(cuenta).reduce((a, n) => a + n, 0)
+  const quienes = Object.keys(cuenta).length
+
+  const apuntar = async () => {
+    setError(''); setGuardando(true)
+    const filas = Object.entries(cuenta).map(([socio_id, n]) => ({ asociacion_id: asoc, socio_id, fecha: hoy(), categoria: 'merienda',
+      concepto: n > 1 ? `Merienda (${n})` : 'Merienda', importe: -Math.round(n * precio * 100) / 100 }))
+    const { error } = await supabase.from('hucha_movimientos').insert(filas)
+    setGuardando(false)
+    if (error) return setError(error.message)
+    setCuenta({}); setHecho(`Apuntado: ${total} ${total === 1 ? 'merienda' : 'meriendas'} a ${quienes} ${quienes === 1 ? 'socio' : 'socios'} (${eurSigno(total * precio, false)}).`)
+  }
+
+  return (
+    <main className="campos merienda">
+      <div className="barra"><h2>Merienda</h2></div>
+      <p className="nota">Toca <b>+</b> por cada merienda que haya tomado cada uno y pulsa «Apuntar». Se carga al saldo del socio.</p>
+      <div className="filtro-nivel">
+        <button className={'fn' + (!niveles.length ? ' on' : '')} onClick={() => setNiveles([])}>Todos</button>
+        {todosNiveles.map(n => <button key={n} className={'fn' + (niveles.includes(n) ? ' on' : '')} aria-pressed={niveles.includes(n)}
+          onClick={() => setNiveles(v => v.includes(n) ? v.filter(x => x !== n) : [...v, n])}>{n}</button>)}
+      </div>
+      <div className="filtro-nivel" role="group" aria-label="Precio de la merienda">
+        <span>Precio:</span>
+        {PRECIOS.map(p => <button key={p} className={'fn' + (precio === p ? ' on' : '')} aria-pressed={precio === p} onClick={() => cambiarPrecio(p)}>{eurSigno(p, false)}</button>)}
+      </div>
+      <div className="formgrid"><label className="campo ancho"><span>Buscar</span><input value={q} onChange={e => setQ(e.target.value)} placeholder="Nombre o apellidos" /></label></div>
+      {hecho && <p className="okmsg">{hecho}</p>}
+
+      <div className="merienda-lista">
+        {visibles.map(s => {
+          const n = cuenta[s.id] || 0
+          return (
+            <div key={s.id} className={'merienda-fila' + (n ? ' con' : '')}>
+              <span><b>{nombreCompleto(s)}</b><small>{s.nivel}</small></span>
+              <span className="contador">
+                <button aria-label={`Quitar una merienda a ${s.nombre}`} disabled={!n} onClick={() => mover(s.id, -1)}>−</button>
+                <output aria-live="polite">{n}</output>
+                <button aria-label={`Añadir una merienda a ${s.nombre}`} onClick={() => mover(s.id, 1)}>+</button>
+              </span>
+            </div>
+          )
+        })}
+        {visibles.length === 0 && <p className="aviso">No hay socios con esos filtros.</p>}
+      </div>
+
+      <div className="merienda-barra">
+        <span>{total ? <><b>{total}</b> {total === 1 ? 'merienda' : 'meriendas'} · {quienes} {quienes === 1 ? 'socio' : 'socios'} · <b>{eurSigno(total * precio, false)}</b></> : 'Nada que apuntar todavía'}</span>
+        {total > 0 && <button onClick={() => setCuenta({})}>Vaciar</button>}
+        <button className="primario" disabled={!total || guardando} onClick={apuntar}>{guardando ? 'Guardando…' : 'Apuntar'}</button>
+      </div>
+    </main>
   )
 }
