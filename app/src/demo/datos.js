@@ -70,6 +70,7 @@ export function crearBD() {
       { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },
       { clave: 'campos_trabajo', nombre: 'Campos de trabajo', descripcion: 'Dinero ganado por los socios y su uso en convivencias y cursos de retiro' },
       { clave: 'herramientas', nombre: 'Herramientas', descripcion: 'Utilidades para el equipo: postales y más' },
+      { clave: 'dineros', nombre: 'Dineros', descripcion: 'Saldo de cada socio: deudas y ahorros (meriendas, cenas, planes, convivencias)' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -80,6 +81,7 @@ export function crearBD() {
       { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'campos_trabajo', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'herramientas', permitida: true, activa: true },
+      { asociacion_id: ASOC, app_clave: 'dineros', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
     ],
     accesos_permitidos: [
@@ -114,7 +116,7 @@ export function crearBD() {
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
       direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
-    planes: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [],
+    planes: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [], hucha_movimientos: [],
     pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
@@ -168,6 +170,7 @@ export function crearBD() {
         nombre_padre: `${padre} ${ap1}`, nombre_madre: `${madre} ${ap2}`,
         alergias: r() < 0.15 ? elige(ALERGIAS) : null,
         direccion: `${elige(CALLES)} ${1 + Math.floor(r() * 80)}, ${1 + Math.floor(r() * 6)}º`,
+        codigo_postal: '280' + String(10 + (nombre.length * 7 + ap1.length * 3) % 40).padStart(2, '0'), localidad: 'Madrid', provincia: 'Madrid',
         correo_padre: sinAcentos(`${padre}.${ap1}`) + '@example.com',
         correo_madre: sinAcentos(`${madre}.${ap2}`) + '@example.com',
         correo_socio: edadBase >= 12 ? `${base}@example.com` : null,
@@ -207,6 +210,8 @@ export function crearBD() {
   const conRetiro = db.campo_participantes.find(x => x.campo_id === 'ct-1')
   if (conRetiro) db.retiradas_campo.push({ id: 'rc-1', asociacion_id: ASOC, socio_id: conRetiro.socio_id, actividad_id: 'pl-6',
     actividad_titulo: 'Curso de retiro de otoño', importe: 30, fecha: H, nota: null, creado_por: 'u-enc', creado_en: H })
+  if (conRetiro) db.hucha_movimientos.push({ id: 'hm-r1', asociacion_id: ASOC, socio_id: conRetiro.socio_id, fecha: H, categoria: 'curso_retiro',
+    concepto: 'Pagado con campos de trabajo: Curso de retiro de otoño', importe: 30, retirada_id: 'rc-1', creado_por: 'u-enc', creado_en: H })
   db.socios_bancarios.push({ socio_id: 's-1', iban: 'ES9121000418450200051332' })
 
   // Dos hermanos vinculados a la cuenta de familia de ejemplo
@@ -216,6 +221,11 @@ export function crearBD() {
     h.correo_madre = 'familia@demo.es'
     db.familiares_socios.push({ email: 'familia@demo.es', socio_id: h.id })
   }
+  // Hucha de los hermanos de ejemplo
+  const mov = (i, h, dias, categoria, concepto, importe) => db.hucha_movimientos.push({ id: `hm-${i}`, asociacion_id: ASOC, socio_id: h.id,
+    fecha: iso(new Date(deIso(H).getTime() - dias * 864e5)), categoria, concepto, importe, retirada_id: null, creado_por: 'u-enc', creado_en: H })
+  mov(1, h1, 21, 'merienda', 'Merienda', -1); mov(2, h1, 14, 'merienda', 'Merienda', 7); mov(3, h1, 6, 'cena', 'Cena de grupo', -4.5)
+  mov(4, h2, 10, 'plan', 'Plan: bolera', -6); mov(5, h2, 3, 'otro', 'Ingreso de los padres', 10)
 
   // ---- Asistencia de los últimos 24 meses ----
   const propension = Object.fromEntries(db.socios.map(s => [s.id, 0.65 + r() * 0.35]))

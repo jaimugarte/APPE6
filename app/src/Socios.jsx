@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { NIVELES, hoy, fecha, edad, normalizarIban, ibanValido, esEmail } from './util'
+import { NIVELES, hoy, fecha, edad, normalizarIban, ibanValido, esEmail, esCodigoPostal } from './util'
 import { eur, textoDescuento } from './cuotas'
 import ImportarSocios from './ImportarSocios'
 
 const VACIO = {
   nombre: '', apellidos: '', fecha_nacimiento: '', nivel: '',
-  nombre_padre: '', nombre_madre: '', alergias: '', direccion: '',
+  nombre_padre: '', nombre_madre: '', alergias: '', direccion: '', codigo_postal: '', localidad: '', provincia: '',
   correo_padre: '', correo_madre: '', correo_socio: '', movil_padre: '', movil_madre: ''
 }
 // Círculos y catequesis solo se preguntan desde 2º ESO (Universidad incluida)
@@ -162,6 +162,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
     if (!f.nombre.trim() || !f.apellidos.trim()) return setMsg('Nombre y apellidos son obligatorios.')
     for (const [k, t] of [['correo_padre', 'del padre'], ['correo_madre', 'de la madre'], ['correo_socio', 'del socio']])
       if (!esEmail(f[k].trim())) return setMsg(`El correo ${t} no es válido.`)
+    if (!esCodigoPostal(f.codigo_postal)) return setMsg('El código postal debe tener 5 cifras.')
     if (esEncargado && iban.trim() && !ibanValido(iban)) return setMsg('El IBAN no es válido.')
 
     const datos = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim() || null]))
@@ -256,7 +257,10 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
           <Campo label="Móvil de la madre"><input type="tel" value={f.movil_madre} onChange={set('movil_madre')} disabled={ro} /></Campo>
           <Campo label="Correo de la madre"><input type="email" value={f.correo_madre} onChange={set('correo_madre')} disabled={ro} /></Campo>
           <Campo label="Correo del socio"><input type="email" value={f.correo_socio} onChange={set('correo_socio')} disabled={ro} /></Campo>
-          <Campo label="Dirección de casa" ancho><input value={f.direccion} onChange={set('direccion')} disabled={ro} /></Campo>
+          <Campo label="Dirección de casa (calle, número, piso)" ancho><input value={f.direccion} onChange={set('direccion')} disabled={ro} /></Campo>
+          <Campo label="Código postal"><input inputMode="numeric" maxLength={5} value={f.codigo_postal} onChange={set('codigo_postal')} disabled={ro} /></Campo>
+          <Campo label="Localidad"><input value={f.localidad} onChange={set('localidad')} disabled={ro} /></Campo>
+          <Campo label="Provincia"><input value={f.provincia} onChange={set('provincia')} disabled={ro} /></Campo>
         </div>
       </section>
 

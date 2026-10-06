@@ -101,6 +101,7 @@ create table socios (
   nombre_madre text,
   alergias text,
   direccion text,
+  codigo_postal text, localidad text, provincia text,
   correo_padre text,
   correo_madre text,
   correo_socio text,
@@ -445,7 +446,7 @@ create table familias (
   nombre_padre text, nombre_madre text,
   correo_padre text, correo_madre text,
   movil_padre text, movil_madre text,
-  direccion text,
+  direccion text, codigo_postal text, localidad text, provincia text,
   -- Descuento concedido a la familia (excepciones). Lo ponen el encargado o, si éste lo permite, los preceptores.
   descuento_tipo text not null default 'porcentaje' check (descuento_tipo in ('porcentaje', 'euros')),
   descuento_valor numeric(8,2) not null default 0 check (descuento_valor >= 0 and (descuento_tipo <> 'porcentaje' or descuento_valor <= 100)),
@@ -566,7 +567,10 @@ begin
     'nombre_padre', v_np, 'nombre_madre', v_nm, 'correo_padre', v_cp, 'correo_madre', v_cm,
     'movil_padre', left(trim(coalesce(t->>'movil_padre', '')), 30),
     'movil_madre', left(trim(coalesce(t->>'movil_madre', '')), 30),
-    'direccion', left(trim(coalesce(t->>'direccion', '')), 200)));
+    'direccion', left(trim(coalesce(t->>'direccion', '')), 200),
+    'codigo_postal', left(trim(coalesce(t->>'codigo_postal', '')), 10),
+    'localidad', left(trim(coalesce(t->>'localidad', '')), 100),
+    'provincia', left(trim(coalesce(t->>'provincia', '')), 100)));
 exception when unique_violation then
   raise exception 'Ya hay una solicitud pendiente con alguno de esos correos';
 end $$;
@@ -627,11 +631,15 @@ begin
     nombre_madre = nullif(left(trim(coalesce(t->>'nombre_madre', '')), 120), ''),
     movil_padre = nullif(left(trim(coalesce(t->>'movil_padre', '')), 30), ''),
     movil_madre = nullif(left(trim(coalesce(t->>'movil_madre', '')), 30), ''),
-    direccion = nullif(left(trim(coalesce(t->>'direccion', '')), 200), '')
+    direccion = nullif(left(trim(coalesce(t->>'direccion', '')), 200), ''),
+    codigo_postal = nullif(left(trim(coalesce(t->>'codigo_postal', '')), 10), ''),
+    localidad = nullif(left(trim(coalesce(t->>'localidad', '')), 100), ''),
+    provincia = nullif(left(trim(coalesce(t->>'provincia', '')), 100), '')
   where id = f.id
   returning * into f;
   update socios set nombre_padre = f.nombre_padre, nombre_madre = f.nombre_madre,
-                    movil_padre = f.movil_padre, movil_madre = f.movil_madre, direccion = f.direccion
+                    movil_padre = f.movil_padre, movil_madre = f.movil_madre, direccion = f.direccion,
+                    codigo_postal = f.codigo_postal, localidad = f.localidad, provincia = f.provincia
     where asociacion_id = f.asociacion_id
       and id in (select socio_id from familiares_socios where email = any(f.emails));
 end $$;
@@ -740,9 +748,9 @@ begin
   select * into f from familias where asociacion_id = s.asociacion_id and emails && v_emails limit 1;
   if f.id is null then
     insert into familias(asociacion_id, emails, nombre_padre, nombre_madre, correo_padre, correo_madre,
-                         movil_padre, movil_madre, direccion)
+                         movil_padre, movil_madre, direccion, codigo_postal, localidad, provincia)
     values (s.asociacion_id, v_emails, s.nombre_padre, s.nombre_madre, s.correo_padre, s.correo_madre,
-            s.movil_padre, s.movil_madre, s.direccion);
+            s.movil_padre, s.movil_madre, s.direccion, s.codigo_postal, s.localidad, s.provincia);
   else
     update familias set emails = (select array_agg(distinct e) from unnest(f.emails || v_emails) e) where id = f.id;
   end if;
@@ -767,19 +775,20 @@ begin
         raise exception 'Un correo de la solicitud ya pertenece a otra asociación';
       end if;
       insert into familias(asociacion_id, emails, nombre_padre, nombre_madre, correo_padre, correo_madre,
-                           movil_padre, movil_madre, direccion)
+                           movil_padre, movil_madre, direccion, codigo_postal, localidad, provincia)
       values (s.asociacion_id, v_emails, nullif(d->>'nombre_padre', ''), nullif(d->>'nombre_madre', ''),
               nullif(d->>'correo_padre', ''), nullif(d->>'correo_madre', ''),
-              nullif(d->>'movil_padre', ''), nullif(d->>'movil_madre', ''), nullif(d->>'direccion', ''));
+              nullif(d->>'movil_padre', ''), nullif(d->>'movil_madre', ''), nullif(d->>'direccion', ''),
+              nullif(d->>'codigo_postal', ''), nullif(d->>'localidad', ''), nullif(d->>'provincia', ''));
       insert into accesos_permitidos(email, asociacion_id, rol, anadido_por)
         select e, s.asociacion_id, 'familia', auth.uid() from unnest(v_emails) e
         on conflict (email) do nothing;
     else
       select * into v_fam from familias where asociacion_id = s.asociacion_id and s.email = any(emails);
       insert into socios(asociacion_id, nombre, apellidos, fecha_nacimiento, nivel, nombre_padre, nombre_madre,
-                         alergias, direccion, correo_padre, correo_madre, correo_socio, movil_padre, movil_madre)
+                         alergias, direccion, codigo_postal, localidad, provincia, correo_padre, correo_madre, correo_socio, movil_padre, movil_madre)
       values (s.asociacion_id, d->>'nombre', d->>'apellidos', nullif(d->>'fecha_nacimiento', '')::date, d->>'nivel',
-              v_fam.nombre_padre, v_fam.nombre_madre, nullif(d->>'alergias', ''), v_fam.direccion,
+              v_fam.nombre_padre, v_fam.nombre_madre, nullif(d->>'alergias', ''), v_fam.direccion, v_fam.codigo_postal, v_fam.localidad, v_fam.provincia,
               v_fam.correo_padre, v_fam.correo_madre, nullif(d->>'correo_socio', ''),
               v_fam.movil_padre, v_fam.movil_madre)
       returning id into v_socio;
@@ -1046,11 +1055,111 @@ language sql stable security definer set search_path = public as $$
 
 -- Datos mínimos para las etiquetas de postales: socios de alta con su dirección y correos de los padres (para agrupar hermanos)
 create or replace function direcciones_postales()
-returns table(id uuid, nombre text, apellidos text, nivel text, direccion text, correo_padre text, correo_madre text)
+returns table(id uuid, nombre text, apellidos text, nivel text, direccion text, codigo_postal text, localidad text, provincia text, correo_padre text, correo_madre text)
 language sql stable security definer set search_path = public as $$
-  select s.id, s.nombre, s.apellidos, s.nivel, s.direccion, s.correo_padre, s.correo_madre
+  select s.id, s.nombre, s.apellidos, s.nivel, s.direccion, s.codigo_postal, s.localidad, s.provincia, s.correo_padre, s.correo_madre
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo_app(s.asociacion_id, 'herramientas')
     and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+  order by s.apellidos, s.nombre $$;
+
+-- ---------- DINEROS / HUCHA ----------
+-- Saldo de cada socio (meriendas, cenas, planes, convivencias…; sin contar las cuotas). Lo gestiona el equipo desde «Dineros»
+-- (encargado y todos los preceptores) y las familias lo ven, solo lectura, en la «Hucha» de cada hijo.
+-- Saldo total = movimientos manuales + ganado en campos de trabajo − retirado de campos de trabajo.
+insert into apps(clave, nombre, descripcion) values
+  ('dineros', 'Dineros', 'Saldo de cada socio: deudas y ahorros (meriendas, cenas, planes, convivencias)')
+  on conflict (clave) do nothing;
+
+create table if not exists hucha_movimientos (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  socio_id uuid not null references socios on delete cascade,
+  fecha date not null default current_date,
+  categoria text not null check (categoria in ('merienda', 'cena', 'plan', 'convivencia', 'curso_retiro', 'otro')),
+  concepto text check (char_length(concepto) <= 120),
+  importe numeric(10,2) not null check (importe <> 0 and abs(importe) < 100000),   -- + ingreso / − cargo
+  retirada_id uuid references retiradas_campo on delete cascade,                    -- lo crea solo «Retirar» de un campo de trabajo
+  creado_por uuid references perfiles default auth.uid(),
+  creado_en timestamptz not null default now()
+);
+create index if not exists hucha_mov_socio on hucha_movimientos(socio_id, fecha);
+
+alter table hucha_movimientos enable row level security;
+drop policy if exists hm_ver on hucha_movimientos; drop policy if exists hm_ins on hucha_movimientos;
+drop policy if exists hm_del on hucha_movimientos;
+create policy hm_ver on hucha_movimientos for select using (es_equipo_app(asociacion_id, 'dineros'));
+create policy hm_ins on hucha_movimientos for insert
+  with check (es_equipo_app(asociacion_id, 'dineros') and retirada_id is null and asoc_de_socio(socio_id) = asociacion_id);
+create policy hm_del on hucha_movimientos for delete using (es_equipo_app(asociacion_id, 'dineros') and retirada_id is null);
+-- (no hay UPDATE: para corregir, se borra y se vuelve a apuntar)
+
+create or replace function saldo_hucha(p_socio uuid) returns numeric
+language sql stable security definer set search_path = public as $$
+  select coalesce((select sum(importe) from hucha_movimientos where socio_id = p_socio), 0) + saldo_campo(p_socio) $$;
+
+-- Puede ver la hucha de un socio: el equipo (con «Dineros» activa) o su familia (si «Dineros» está activa)
+create or replace function puede_ver_hucha(p_socio uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from socios s
+    where s.id = p_socio
+      and exists (select 1 from asociacion_apps where asociacion_id = s.asociacion_id and app_clave = 'dineros' and activa)
+      and (es_equipo_app(s.asociacion_id, 'dineros')
+           or exists (select 1 from familiares_socios f where f.socio_id = s.id and f.email = email_actual()))) $$;
+
+-- Saldos: todos los socios para el equipo; solo sus hijos para una familia
+create or replace function hucha_saldos() returns table(socio_id uuid, saldo numeric)
+language sql stable security definer set search_path = public as $$
+  select s.id, saldo_hucha(s.id) from socios s where puede_ver_hucha(s.id) $$;
+
+-- Histórico de un socio (más reciente primero)
+create or replace function hucha_historial(p_socio uuid)
+returns table(id uuid, fecha date, concepto text, categoria text, importe numeric, origen text)
+language sql stable security definer set search_path = public as $$
+  select x.id, x.fecha, x.concepto, x.categoria, x.importe, x.origen from (
+    select m.id, m.fecha, m.concepto, m.categoria, m.importe,
+           case when m.retirada_id is null then 'manual' else 'retirada' end as origen, m.creado_en
+      from hucha_movimientos m where m.socio_id = p_socio
+    union all
+    select null::uuid, c.fecha, 'Campo de trabajo: ' || c.nombre, 'campo_trabajo', cp.importe, 'campo', c.creado_en
+      from campo_participantes cp join campos_trabajo c on c.id = cp.campo_id
+      where cp.socio_id = p_socio and cp.importe > 0
+    union all
+    select null::uuid, r.fecha, 'Retirada de campos de trabajo: ' || r.actividad_titulo, 'campo_retirada', -r.importe, 'campo', r.creado_en
+      from retiradas_campo r where r.socio_id = p_socio
+  ) x
+  where puede_ver_hucha(p_socio)
+  order by x.fecha desc, x.creado_en desc $$;
+
+-- Retirar de campos de trabajo para pagar una actividad: baja lo disponible en campos y paga ese importe de la deuda
+create or replace function retirar_campo(p_socio uuid, p_actividad uuid, p_importe numeric, p_nota text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare s socios; a record; v_id uuid;
+begin
+  select * into s from socios where id = p_socio for update;
+  if s.id is null or not es_equipo(s.asociacion_id) then raise exception 'Sin permiso'; end if;
+  if p_importe is null or p_importe <= 0 then raise exception 'El importe debe ser mayor que 0'; end if;
+  select * into a from actividades_para_retirar(p_socio) where id = p_actividad;
+  if a.id is null then raise exception 'Esa actividad no está disponible para este socio'; end if;
+  if p_importe > saldo_campo(p_socio) then raise exception 'El socio solo tiene % € disponibles', saldo_campo(p_socio); end if;
+  insert into retiradas_campo(asociacion_id, socio_id, actividad_id, actividad_titulo, importe, nota)
+    values (s.asociacion_id, p_socio, a.id, a.titulo, round(p_importe, 2), nullif(left(trim(coalesce(p_nota, '')), 300), ''))
+    returning retiradas_campo.id into v_id;
+  insert into hucha_movimientos(asociacion_id, socio_id, categoria, concepto, importe, retirada_id)
+    values (s.asociacion_id, p_socio, case when a.tipo = 'curso_retiro' then 'curso_retiro' else 'convivencia' end,
+            left('Pagado con campos de trabajo: ' || a.titulo, 120), round(p_importe, 2), v_id);
+  return v_id;
+end $$;
+
+-- Lista de socios con su saldo para «Dineros» (equipo)
+create or replace function socios_dineros()
+returns table(id uuid, nombre text, apellidos text, nivel text, activo boolean, saldo numeric)
+language sql stable security definer set search_path = public as $$
+  select s.id, s.nombre, s.apellidos, s.nivel,
+         exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null),
+         saldo_hucha(s.id)
+  from socios s
+  where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
+    and es_equipo_app(s.asociacion_id, 'dineros')
   order by s.apellidos, s.nombre $$;

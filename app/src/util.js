@@ -43,6 +43,8 @@ export const abrev = t =>
 // Normaliza lo que escribe el encargado: mayúsculas, sin espacios, máximo 6 caracteres
 export const limpiarAbrev = s => (s || '').replace(/\s+/g, '').toUpperCase().slice(0, 6)
 
+// Código postal español: 5 cifras (vacío vale)
+export const esCodigoPostal = s => !s || /^\d{5}$/.test(s.trim())
 export const esEmail = s => !s || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
 // ---------- Periodos de actividad ----------

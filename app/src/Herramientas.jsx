@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { IconoApp } from './iconos'
-import { nivelesDe, familiasDeNiveles, etiquetaDe } from './postales'
+import { nivelesDe, familiasDeNiveles, etiquetaDe, avisoDireccion } from './postales'
 import { FORMATOS, generarPdfEtiquetas } from './pdfEtiquetas'
 
 // Herramientas: utilidades para el equipo (encargado y todos los preceptores).
@@ -77,7 +77,7 @@ function Postales({ onVolver }) {
             {conDir.map(x => (
               <label key={x.id} className="check-fila">
                 <input type="checkbox" checked={!excluidas.has(x.id)} onChange={() => marcar(x.id)} />
-                <span><b>{x.nombre}</b> · {x.niveles.join(', ')}<br /><small>{x.direccion.replace(/\r?\n|;/g, ', ')}{x.aviso ? ' ⚠ ' + x.aviso : ''}</small></span>
+                <span><b>{x.nombre}</b> · {x.niveles.join(', ')}<br /><small>{etiquetaDe(x).direccion.join(', ')}{[avisoDireccion(x), x.aviso].filter(Boolean).map(a => ' ⚠ ' + a).join('')}</small></span>
               </label>
             ))}
           </div>

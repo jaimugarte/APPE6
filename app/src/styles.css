@@ -417,3 +417,16 @@ input.importe { width: 84px; min-height: 40px; text-align: right; }
 .acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
 a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--linea-fuerte); border-radius: 12px; background: var(--superficie); color: var(--acento); text-decoration: none; font-weight: 600; }
 .check-fila small { color: var(--tinta-2); }
+
+/* Hucha y Dineros */
+.saldo-neg { color: #b42318; } .saldo-pos { color: #067647; } .saldo-cero { color: var(--tinta-2); }
+.hucha-saldo { margin: 0; font-size: 1.1rem; } .hucha-saldo b { font-family: var(--serif); font-size: 1.6rem; margin-left: 6px; }
+.hucha-totales { margin: 8px 0; }
+.hucha-lista { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.hucha-lista li { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--linea); border-radius: 12px; background: var(--superficie); }
+.hucha-lista li > span:first-child { display: grid; min-width: 0; } .hucha-lista small { color: var(--tinta-2); }
+.hucha-importe { font-weight: 700; white-space: nowrap; margin-left: auto; }
+.hucha-lista .chip-x { min-height: 0; width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 0; background: transparent; color: var(--tinta-2); font-size: 1.2rem; line-height: 1; }
+.hucha-socios { display: grid; gap: 6px; margin-top: 8px; }
+.hucha-fila { display: flex; align-items: center; gap: 10px; } .hucha-fila .item { flex: 1; }
+.hucha-fila input[type=checkbox] { width: 20px; height: 20px; flex: none; }

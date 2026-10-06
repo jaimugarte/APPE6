@@ -28,12 +28,14 @@ export function agruparFamilias(socios) {
     for (const h of hijos) if (h.apellidos?.trim() && !apellidos.some(a => norm(a) === norm(h.apellidos))) apellidos.push(h.apellidos.trim())
     // Dirección: la más repetida entre los hijos; si hay varias distintas se avisa
     const cuenta = new Map()
-    for (const h of hijos) { const d = (h.direccion || '').trim(); if (d) cuenta.set(norm(d), { d, n: (cuenta.get(norm(d))?.n || 0) + 1 }) }
+    const completa = h => [h.direccion, h.codigo_postal, h.localidad, h.provincia].map(x => (x || '').trim())
+    for (const h of hijos) { const c = completa(h); if (c[0]) { const k = c.map(norm).join('|'); cuenta.set(k, { c, n: (cuenta.get(k)?.n || 0) + 1 }) } }
     const dirs = [...cuenta.values()].sort((a, b) => b.n - a.n)
     return {
       id: hijos.map(h => h.id).sort()[0],
       nombre: 'Familia ' + (apellidos.join(' / ') || 'sin apellidos'),
-      direccion: dirs[0]?.d || '',
+      direccion: dirs[0]?.c[0] || '',
+      codigo_postal: dirs[0]?.c[1] || '', localidad: dirs[0]?.c[2] || '', provincia: dirs[0]?.c[3] || '',
       niveles: [...new Set(hijos.map(h => h.nivel).filter(Boolean))].sort(ordenNivel),
       hijos: hijos.map(h => h.nombre),
       aviso: dirs.length > 1 ? 'Los hijos tienen direcciones distintas: se usa la más repetida.' : ''
@@ -46,8 +48,20 @@ export function familiasDeNiveles(socios, niveles) {
   return agruparFamilias(socios.filter(s => niveles.includes(s.nivel)))
 }
 
-// Texto de una etiqueta: primero «Familia …» (en negrita) y debajo la dirección tal como se escribió
+// Texto de una etiqueta, con el formato habitual de las cartas en España:
+//   Familia González Pérez
+//   Calle Mayor 12, 3º B
+//   28001 MADRID            (o «28001 ALCALÁ DE HENARES (MADRID)» si la provincia es otra)
 export function etiquetaDe(f) {
   const lineas = (f.direccion || '').split(/\r?\n|;/).map(l => l.trim()).filter(Boolean)
+  const loc = (f.localidad || '').trim().toUpperCase(), prov = (f.provincia || '').trim().toUpperCase()
+  const ciudad = [(f.codigo_postal || '').trim(), loc].filter(Boolean).join(' ')
+  const ultima = prov && norm(prov) !== norm(loc) ? (ciudad ? `${ciudad} (${prov})` : prov) : ciudad
+  if (ultima) lineas.push(ultima)
   return { titulo: f.nombre, direccion: lineas }
 }
+
+// Aviso si a la dirección le falta algo para que llegue la carta
+export const avisoDireccion = f => !f.direccion ? 'Sin dirección'
+  : !/^\d{5}$/.test((f.codigo_postal || '').trim()) ? 'Sin código postal'
+  : !(f.localidad || '').trim() ? 'Sin localidad' : ''

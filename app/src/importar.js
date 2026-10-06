@@ -4,8 +4,9 @@ import { NIVELES, esEmail, nivelPorNacimiento } from './util.js'
 export const COLUMNAS = [
   'nombre', 'apellidos', 'fecha_nacimiento', 'nivel', 'fecha_alta',
   'nombre_padre', 'correo_padre', 'movil_padre', 'nombre_madre', 'correo_madre', 'movil_madre',
-  'correo_socio', 'direccion', 'alergias'
+  'correo_socio', 'direccion', 'codigo_postal', 'localidad', 'provincia', 'alergias'
 ]
+const OPCIONALES = ['codigo_postal', 'localidad', 'provincia']   // las plantillas antiguas no las traen
 
 // Ayuda que se muestra junto a la plantilla
 export const AYUDA = {
@@ -13,12 +14,12 @@ export const AYUDA = {
   fecha_nacimiento: 'AAAA-MM-DD o DD/MM/AAAA. Obligatoria si no indicas el nivel',
   nivel: 'p. ej. 2º ESO. Si lo dejas vacío se calcula con la fecha de nacimiento',
   fecha_alta: 'Vacía = hoy', nombre_padre: '', correo_padre: 'Identifica a la familia', movil_padre: '',
-  nombre_madre: '', correo_madre: 'Identifica a la familia', movil_madre: '', correo_socio: '', direccion: '', alergias: ''
+  nombre_madre: '', correo_madre: 'Identifica a la familia', movil_madre: '', correo_socio: '', direccion: 'Calle, número, piso', codigo_postal: '5 cifras', localidad: '', provincia: '', alergias: ''
 }
 
 export const MAX_FILAS = 500
 export const MAX_BYTES = 1_000_000
-const LARGO = { nombre: 100, apellidos: 150, nivel: 40, nombre_padre: 150, nombre_madre: 150, direccion: 250, alergias: 500, correo_padre: 200, correo_madre: 200, correo_socio: 200 }
+const LARGO = { nombre: 100, apellidos: 150, nivel: 40, nombre_padre: 150, nombre_madre: 150, direccion: 250, codigo_postal: 10, localidad: 100, provincia: 100, alergias: 500, correo_padre: 200, correo_madre: 200, correo_socio: 200 }
 
 // Plantilla: solo la cabecera (con «;» y BOM, para que Excel en español la abra bien)
 export const plantillaCsv = () => '﻿' + COLUMNAS.join(';') + '\r\n'
@@ -47,7 +48,7 @@ export function leerCsv(texto) {
 // Comprueba la cabecera: deben estar todas las columnas de la plantilla y ninguna más (el orden da igual)
 export function comprobarCabecera(cab) {
   const nombres = cab.map(c => c.trim().toLowerCase())
-  const faltan = COLUMNAS.filter(c => !nombres.includes(c))
+  const faltan = COLUMNAS.filter(c => !OPCIONALES.includes(c) && !nombres.includes(c))
   const sobran = nombres.filter(c => c && !COLUMNAS.includes(c))
   const repetidas = nombres.filter((c, i) => c && nombres.indexOf(c) !== i)
   return { ok: !faltan.length && !sobran.length && !repetidas.length, faltan, sobran, repetidas, nombres }
@@ -95,6 +96,7 @@ export function analizar(objetos, existentes, { hoyIso, nivelesPermitidos = null
       d[c] = d[c].toLowerCase()
       if (d[c] && !esEmail(d[c])) errores.push(`${c} no es un correo válido`)
     }
+    if (d.codigo_postal && !/^\d{5}$/.test(d.codigo_postal)) errores.push('codigo_postal debe tener 5 cifras')
     for (const c of ['movil_padre', 'movil_madre']) if (d[c]) {
       const v = movilValido(d[c]); if (v) d[c] = v; else errores.push(`${c} no es un teléfono válido`)
     }

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { esEmail } from './util'
+import { esEmail, esCodigoPostal } from './util'
 import { Logo } from './iconos'
 
 const VACIO = {
   nombre_padre: '', correo_padre: '', movil_padre: '', nombre_madre: '', correo_madre: '', movil_madre: '',
-  direccion: '', consentimiento: false, web: ''
+  direccion: '', codigo_postal: '', localidad: '', provincia: '', consentimiento: false, web: ''
 }
 
 // Formulario público (sin iniciar sesión) al que lleva el enlace de invitación: solicitud de alta de una familia.
@@ -31,6 +31,7 @@ export default function FormularioAlta({ token }) {
     if (!hayPadre && !hayMadre) return setError('Indica al menos un progenitor o tutor, con su nombre y su correo de Google.')
     if (hayPadre && (!f.nombre_padre.trim() || !cp || !esEmail(cp))) return setError('Revisa el nombre y el correo de Google del padre o tutor.')
     if (hayMadre && (!f.nombre_madre.trim() || !cm || !esEmail(cm))) return setError('Revisa el nombre y el correo de Google de la madre o tutora.')
+    if (!esCodigoPostal(f.codigo_postal)) return setError('El código postal debe tener 5 cifras.')
     if (cp && cp.toLowerCase() === cm.toLowerCase()) return setError('El padre y la madre necesitan correos distintos.')
     if (!f.consentimiento) return setError('Debes aceptar el tratamiento de los datos para enviar la solicitud.')
     setEnviando(true)
@@ -95,7 +96,10 @@ export default function FormularioAlta({ token }) {
 
         <section>
           <h2>Domicilio</h2>
-          <label className="campo">Dirección<input value={f.direccion} onChange={set('direccion')} autoComplete="street-address" /></label>
+          <label className="campo">Dirección (calle, número, piso)<input value={f.direccion} onChange={set('direccion')} autoComplete="address-line1" /></label>
+          <label className="campo">Código postal<input inputMode="numeric" maxLength={5} value={f.codigo_postal} onChange={set('codigo_postal')} autoComplete="postal-code" /></label>
+          <label className="campo">Localidad<input value={f.localidad} onChange={set('localidad')} autoComplete="address-level2" /></label>
+          <label className="campo">Provincia<input value={f.provincia} onChange={set('provincia')} autoComplete="address-level1" /></label>
         </section>
 
         {/* Campo trampa: las personas no lo ven; los robots suelen rellenarlo */}

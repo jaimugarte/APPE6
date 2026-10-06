@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], socios_equipo: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], hucha_movimientos: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
 }
 
 const REL = {
@@ -92,6 +92,9 @@ export function crearClienteDemo() {
   // Campos de trabajo: encargado y todos los preceptores (sin pasar por permisos), si la app está activa
   const esEquipo = (u, asoc) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, 'campos_trabajo')
   const campoDe = id => db.campos_trabajo.find(c => c.id === id)
+  const esEquipoApp = (u, asoc, app) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, app)
+  const saldoHucha = id => Math.round((db.hucha_movimientos.filter(x => x.socio_id === id).reduce((a, x) => a + Number(x.importe), 0) + saldoCampo(id)) * 100) / 100
+  const puedeVerHucha = (u, s) => !!u && !!s && s.asociacion_id === u.asoc && appActiva(u, 'dineros') && (esEquipoApp(u, s.asociacion_id, 'dineros') || (u.rol === 'familia' && esFamiliar(u, s.id)))
   const saldoCampo = socioId =>
     db.campo_participantes.filter(x => x.socio_id === socioId).reduce((a, x) => a + Number(x.importe), 0)
     - db.retiradas_campo.filter(x => x.socio_id === socioId).reduce((a, x) => a + Number(x.importe), 0)
@@ -165,6 +168,7 @@ export function crearClienteDemo() {
       case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
       case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id)
       case 'retiradas_campo': return esEquipo(u, r.asociacion_id)
+      case 'hucha_movimientos': return esEquipoApp(u, r.asociacion_id, 'dineros')
       case 'solicitudes_alta': return puedeAprobar(u, r.asociacion_id, r.niveles) || r.email === u.email
       default: return false
     }
@@ -186,6 +190,7 @@ export function crearClienteDemo() {
       case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
       case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id) && socioDe(r.socio_id)?.asociacion_id === campoDe(r.campo_id)?.asociacion_id
       case 'retiradas_campo': return u.rol === 'encargado' && esEquipo(u, r.asociacion_id)  // solo se anulan; se crean con retirar_campo
+      case 'hucha_movimientos': return esEquipoApp(u, r.asociacion_id, 'dineros') && !r.retirada_id && socioDe(r.socio_id)?.asociacion_id === r.asociacion_id  // los de «Retirar» no se tocan
       case 'pagos_cuota': return u.rol === 'encargado' && db.familias.find(x => x.id === r.familia_id)?.asociacion_id === u.asoc
       default: return false
     }
@@ -203,6 +208,8 @@ export function crearClienteDemo() {
     if (tabla === 'asociacion_apps') { f.permitida ??= false; f.activa ??= false }
     if (tabla === 'periodos_alta') { f.fecha_baja ??= null; f.motivo_baja ??= null }
     if (tabla === 'socios_equipo') { f.asiste_circulos ??= false; f.es_catequista ??= false }
+    if (tabla === 'hucha_movimientos') { f.fecha ??= hoyIso; f.concepto ??= null; f.retirada_id ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso
+      f.importe = Math.round(Number(f.importe) * 100) / 100 }
     if (tabla === 'campos_trabajo') { f.descripcion ??= null; f.responsable_email ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'campo_participantes') f.importe ??= 0
     if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
@@ -227,6 +234,7 @@ export function crearClienteDemo() {
 
   function efectosAlBorrar(tabla, f) {
     // Quitar un correo de la lista blanca retira también el acceso
+    if (tabla === 'retiradas_campo') db.hucha_movimientos = db.hucha_movimientos.filter(m => m.retirada_id !== f.id)
     if (tabla === 'accesos_permitidos') {
       const perfil = db.perfiles.find(p => p.email === f.email)
       if (perfil) db.membresias = db.membresias.filter(m => m.user_id !== perfil.id)
@@ -291,6 +299,8 @@ export function crearClienteDemo() {
           }
           const f = conDefectos(tabla, p)
           if (!escribible(tabla, f)) return err('42501', `new row violates row-level security policy for table "${tabla}"`)
+          if (tabla === 'hucha_movimientos' && (!['merienda', 'cena', 'plan', 'convivencia', 'curso_retiro', 'otro'].includes(f.categoria) || !Number.isFinite(f.importe) || f.importe === 0 || Math.abs(f.importe) >= 100000 || String(f.concepto ?? '').length > 120))
+            return err('23514', 'new row for relation "hucha_movimientos" violates check constraint')
           if (duplicada(tabla, f)) return err('23505', `duplicate key value violates unique constraint on "${tabla}"`)
           filas.push(f); res.push(f); efectosAlInsertar(tabla, f)
         }
@@ -377,9 +387,31 @@ export function crearClienteDemo() {
       if (nombre === 'direcciones_postales') {
         if (!u || !(u.rol === 'encargado' || u.rol === 'preceptor') || !appActiva(u, 'herramientas')) return { data: [], error: null }
         return { data: db.socios.filter(x => x.asociacion_id === u.asoc && db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja))
-          .map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel, direccion: x.direccion ?? null,
+          .map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel, direccion: x.direccion ?? null, codigo_postal: x.codigo_postal ?? null, localidad: x.localidad ?? null, provincia: x.provincia ?? null,
             correo_padre: x.correo_padre ?? null, correo_madre: x.correo_madre ?? null }))
           .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
+      }
+      if (nombre === 'hucha_saldos') {
+        return { data: db.socios.filter(s => puedeVerHucha(u, s)).map(s => ({ socio_id: s.id, saldo: saldoHucha(s.id) })), error: null }
+      }
+      if (nombre === 'socios_dineros') {
+        if (!u || !esEquipoApp(u, u.asoc, 'dineros')) return { data: [], error: null }
+        return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
+          activo: db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja), saldo: saldoHucha(x.id) }))
+          .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
+      }
+      if (nombre === 'hucha_historial') {
+        const s = socioDe(a.p_socio)
+        if (!puedeVerHucha(u, s)) return { data: [], error: null }
+        const filas = [
+          ...db.hucha_movimientos.filter(m => m.socio_id === s.id).map(m => ({ id: m.id, fecha: m.fecha, concepto: m.concepto, categoria: m.categoria, importe: Number(m.importe),
+            origen: m.retirada_id ? 'retirada' : 'manual', _o: m.creado_en })),
+          ...db.campo_participantes.filter(x => x.socio_id === s.id && Number(x.importe) > 0).map(x => { const c = campoDe(x.campo_id)
+            return { id: null, fecha: c.fecha.slice(0, 10), concepto: `Campo de trabajo: ${c.nombre}`, categoria: 'campo_trabajo', importe: Number(x.importe), origen: 'campo', _o: c.creado_en } }),
+          ...db.retiradas_campo.filter(x => x.socio_id === s.id).map(x => ({ id: null, fecha: x.fecha, concepto: `Retirada de campos de trabajo: ${x.actividad_titulo}`,
+            categoria: 'campo_retirada', importe: -Number(x.importe), origen: 'campo', _o: x.creado_en }))
+        ].sort((p, q) => String(q.fecha).localeCompare(String(p.fecha)) || String(q._o ?? '').localeCompare(String(p._o ?? '')))
+        return { data: filas.map(({ _o, ...f }) => f), error: null }
       }
       if (nombre === 'lista_preceptores') {
         if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
@@ -402,6 +434,8 @@ export function crearClienteDemo() {
         const id = uuid()
         db.retiradas_campo.push({ id, asociacion_id: sc.asociacion_id, socio_id: sc.id, actividad_id: act.id, actividad_titulo: act.titulo,
           importe: Math.round(imp * 100) / 100, fecha: hoyIso, nota: String(a.p_nota ?? '').trim().slice(0, 300) || null, creado_por: u.id, creado_en: hoyIso })
+        db.hucha_movimientos.push({ id: uuid(), asociacion_id: sc.asociacion_id, socio_id: sc.id, fecha: hoyIso, categoria: act.tipo === 'curso_retiro' ? 'curso_retiro' : 'convivencia',
+          concepto: `Pagado con campos de trabajo: ${act.titulo}`.slice(0, 120), importe: Math.round(imp * 100) / 100, retirada_id: id, creado_por: u.id, creado_en: hoyIso })
         return { data: id, error: null }
       }
       if (nombre === 'info_enlace') return { data: enlaceVigente(a.p_token) ? db.asociaciones.find(x => x.id === enlaceVigente(a.p_token).asociacion_id).nombre : null, error: null }
@@ -425,7 +459,8 @@ export function crearClienteDemo() {
           niveles: [],
           motivo_resolucion: null, resuelta_por: null, resuelta_en: null, creada_en: hoyIso,
           datos: { nombre_padre: np, nombre_madre: nm, correo_padre: cp, correo_madre: cm,
-            movil_padre: limpio(t.movil_padre, 30), movil_madre: limpio(t.movil_madre, 30), direccion: limpio(t.direccion, 200) }
+            movil_padre: limpio(t.movil_padre, 30), movil_madre: limpio(t.movil_madre, 30), direccion: limpio(t.direccion, 200),
+            codigo_postal: limpio(t.codigo_postal, 10), localidad: limpio(t.localidad, 100), provincia: limpio(t.provincia, 100) }
         })
         return { data: null, error: null }
       }
@@ -447,10 +482,11 @@ export function crearClienteDemo() {
         if (!f) return err('P0001', 'No tienes una familia registrada')
         const t = a.p_datos || {}, v = (k, n) => limpio(t[k], n) || null
         Object.assign(f, { nombre_padre: v('nombre_padre', 120), nombre_madre: v('nombre_madre', 120),
-          movil_padre: v('movil_padre', 30), movil_madre: v('movil_madre', 30), direccion: v('direccion', 200) })
+          movil_padre: v('movil_padre', 30), movil_madre: v('movil_madre', 30), direccion: v('direccion', 200),
+          codigo_postal: v('codigo_postal', 10), localidad: v('localidad', 100), provincia: v('provincia', 100) })
         const ids = db.familiares_socios.filter(x => f.emails.includes(x.email)).map(x => x.socio_id)
         for (const s of db.socios) if (ids.includes(s.id) && s.asociacion_id === f.asociacion_id)
-          Object.assign(s, { nombre_padre: f.nombre_padre, nombre_madre: f.nombre_madre, movil_padre: f.movil_padre, movil_madre: f.movil_madre, direccion: f.direccion })
+          Object.assign(s, { nombre_padre: f.nombre_padre, nombre_madre: f.nombre_madre, movil_padre: f.movil_padre, movil_madre: f.movil_madre, direccion: f.direccion, codigo_postal: f.codigo_postal, localidad: f.localidad, provincia: f.provincia })
         return { data: null, error: null }
       }
       if (nombre === 'actualizar_hijo') {
@@ -474,7 +510,7 @@ export function crearClienteDemo() {
           if (!emails.length) return { data: null, error: null }
           const f = db.familias.find(x => x.asociacion_id === s.asociacion_id && x.emails.some(e => emails.includes(e)))
           if (!f) db.familias.push({ id: uuid(), asociacion_id: s.asociacion_id, emails, nombre_padre: s.nombre_padre, nombre_madre: s.nombre_madre,
-            correo_padre: s.correo_padre, correo_madre: s.correo_madre, movil_padre: s.movil_padre, movil_madre: s.movil_madre, direccion: s.direccion,
+            correo_padre: s.correo_padre, correo_madre: s.correo_madre, movil_padre: s.movil_padre, movil_madre: s.movil_madre, direccion: s.direccion, codigo_postal: s.codigo_postal ?? null, localidad: s.localidad ?? null, provincia: s.provincia ?? null,
             descuento_tipo: 'porcentaje', descuento_valor: 0, descuento_nota: null, creada_en: hoyIso })
           else f.emails = [...new Set([...f.emails, ...emails])]
           return { data: null, error: null }
@@ -524,7 +560,7 @@ export function crearClienteDemo() {
               return err('P0001', 'Un correo de la solicitud ya pertenece a otra asociación')
             db.familias.push({ id: uuid(), asociacion_id: s.asociacion_id, emails, nombre_padre: d.nombre_padre || null,
               nombre_madre: d.nombre_madre || null, correo_padre: d.correo_padre || null, correo_madre: d.correo_madre || null,
-              movil_padre: d.movil_padre || null, movil_madre: d.movil_madre || null, direccion: d.direccion || null, descuento_tipo: 'porcentaje', descuento_valor: 0, descuento_nota: null, creada_en: hoyIso })
+              movil_padre: d.movil_padre || null, movil_madre: d.movil_madre || null, direccion: d.direccion || null, codigo_postal: d.codigo_postal || null, localidad: d.localidad || null, provincia: d.provincia || null, descuento_tipo: 'porcentaje', descuento_valor: 0, descuento_nota: null, creada_en: hoyIso })
             for (const e of emails) if (!db.accesos_permitidos.some(x => x.email === e))
               db.accesos_permitidos.push({ email: e, asociacion_id: s.asociacion_id, rol: 'familia', anadido_por: u.id })
           } else if (s.tipo === 'socio') {
@@ -532,7 +568,7 @@ export function crearClienteDemo() {
             const id = uuid()
             db.socios.push({ id, asociacion_id: s.asociacion_id, nombre: d.nombre, apellidos: d.apellidos,
               fecha_nacimiento: d.fecha_nacimiento || null, nivel: d.nivel, nombre_padre: fam.nombre_padre ?? null,
-              nombre_madre: fam.nombre_madre ?? null, alergias: d.alergias || null, direccion: fam.direccion ?? null,
+              nombre_madre: fam.nombre_madre ?? null, alergias: d.alergias || null, direccion: fam.direccion ?? null, codigo_postal: fam.codigo_postal ?? null, localidad: fam.localidad ?? null, provincia: fam.provincia ?? null,
               correo_padre: fam.correo_padre ?? null, correo_madre: fam.correo_madre ?? null, correo_socio: d.correo_socio || null,
               movil_padre: fam.movil_padre ?? null, movil_madre: fam.movil_madre ?? null, creado_en: hoyIso })
             db.periodos_alta.push({ id: uuid(), socio_id: id, fecha_alta: hoyIso, fecha_baja: null, motivo_baja: null })

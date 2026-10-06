@@ -128,6 +128,16 @@ App `herramientas` para el equipo: **encargado y todos los preceptores** tienen 
 
 - Formatos de pegatinas A4: 24 (63,5×33,9), 21 (63,5×38,1), 14 (99,1×38,1) y 8 (99,1×67,7) por hoja.
 - «Empezar en la etiqueta nº» sirve para aprovechar una hoja ya empezada. «Dibujar el contorno» permite probar en papel normal. Imprime al 100 %.
+- Formato de carta: «Familia …» / calle y número / «28001 MADRID» (con «(PROVINCIA)» si no coincide con la localidad). La dirección se pide ahora con código postal, localidad y provincia (en el alta, en «Datos de la familia», en la ficha del socio y en el CSV, donde las tres columnas son opcionales). Las familias antiguas solo tienen la calle: se avisa de las que no tienen código postal.
 - Solo Latin-1: caracteres fuera de él (p. ej. «ł») salen como «?».
 - Privacidad: todos los preceptores ven las direcciones de las familias de **todos** los cursos (la función `direcciones_postales()` no filtra por nivel).
 - Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql`.
+
+## Dineros y Hucha
+
+Saldo de cada socio por meriendas, cenas, planes, convivencias y cursos de retiro (las cuotas van aparte, en su sección).
+
+- **Dineros** (app `dineros`, para el equipo): el encargado y **todos los preceptores** pueden verla y apuntar cargos (el socio debe) o ingresos (a favor), con categoría, concepto, importe y fecha, a un socio o a varios a la vez (por curso, con casillas). Se puede borrar un apunte manual equivocado. No aparece en los permisos de Ajustes.
+- **Hucha** (en la ficha de cada hijo, para las familias): saldo total y el histórico completo, **solo lectura**. Solo se ve si «Dineros» está activa en la asociación. Las familias no pueden sumar ni restar.
+- **Saldo** = apuntes manuales + ganado en campos de trabajo − retirado de campos de trabajo. «Retirar» de un campo de trabajo para una convivencia o curso baja lo disponible en campos y apunta automáticamente el pago correspondiente, de modo que el saldo total no cambia (primero se apunta el coste de la actividad como cargo). Al anular una retirada desaparece también ese pago.
+- Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql` (añade la dirección completa, la tabla `hucha_movimientos` y las funciones `hucha_saldos`, `hucha_historial`, `socios_dineros`; el administrador global debe conceder la app «Dineros» y el encargado activarla).

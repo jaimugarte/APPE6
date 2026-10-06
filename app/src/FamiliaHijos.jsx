@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { fecha, edad, nivelPorNacimiento } from './util'
+import { fecha, edad, nivelPorNacimiento, esCodigoPostal } from './util'
+import { HuchaHistorial, saldosHucha } from './Hucha'
+import { eurSigno, claseSaldo } from './huchaUtil'
 import ConfirmarBaja from './ConfirmarBaja'
 
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
@@ -12,6 +14,7 @@ export default function FamiliaHijos({ onCambio }) {
   const [hijos, setHijos] = useState(null)
   const [pendientes, setPendientes] = useState([])
   const [familia, setFamilia] = useState(null)
+  const [saldos, setSaldos] = useState({})
   const [vista, setVista] = useState('lista') // 'lista' | 'familia' | 'nuevo' | id de hijo
   const [msg, setMsg] = useState('')
 
@@ -27,6 +30,7 @@ export default function FamiliaHijos({ onCambio }) {
     setHijos(s.data || [])
     setPendientes(sol.data || [])
     setFamilia(fam.data || null)
+    setSaldos(await saldosHucha())
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
@@ -68,6 +72,7 @@ export default function FamiliaHijos({ onCambio }) {
                 <small className="meta">
                   {hijo.nivel && <span>{hijo.nivel}</span>}
                   {a != null && <span>{a} años</span>}
+                  {saldos[hijo.id] !== undefined && <span>Hucha: <b className={claseSaldo(saldos[hijo.id])}>{eurSigno(saldos[hijo.id], false)}</b></span>}
                 </small>
               </span>
               <span className={act ? 'badge ok' : 'badge baja'}>{act ? 'Activo' : 'Baja'}</span>
@@ -185,6 +190,8 @@ function FichaHijo({ hijo, onVolver, onCambio }) {
         </div>
       </section>
 
+      <HuchaHistorial socioId={hijo.id} seccion />
+
       <section>
         <h2>Alta y baja</h2>
         {act
@@ -200,7 +207,8 @@ function FichaHijo({ hijo, onVolver, onCambio }) {
 function DatosFamilia({ familia, onVolver, onCambio }) {
   const [f, setF] = useState(() => ({
     nombre_padre: familia?.nombre_padre ?? '', movil_padre: familia?.movil_padre ?? '',
-    nombre_madre: familia?.nombre_madre ?? '', movil_madre: familia?.movil_madre ?? '', direccion: familia?.direccion ?? ''
+    nombre_madre: familia?.nombre_madre ?? '', movil_madre: familia?.movil_madre ?? '', direccion: familia?.direccion ?? '',
+    codigo_postal: familia?.codigo_postal ?? '', localidad: familia?.localidad ?? '', provincia: familia?.provincia ?? ''
   }))
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState('')
@@ -208,6 +216,7 @@ function DatosFamilia({ familia, onVolver, onCambio }) {
 
   const guardar = async () => {
     setMsg(''); setOk('')
+    if (!esCodigoPostal(f.codigo_postal)) return setMsg('El código postal debe tener 5 cifras.')
     const { error } = await supabase.rpc('actualizar_familia', { p_datos: f })
     if (error) return setMsg(error.message)
     setOk('Guardado.'); onCambio()
@@ -242,7 +251,10 @@ function DatosFamilia({ familia, onVolver, onCambio }) {
       </section>
       <section>
         <h2>Domicilio</h2>
-        <Campo label="Dirección"><input value={f.direccion} onChange={set('direccion')} autoComplete="street-address" /></Campo>
+        <Campo label="Dirección (calle, número, piso)"><input value={f.direccion} onChange={set('direccion')} autoComplete="address-line1" /></Campo>
+        <Campo label="Código postal"><input inputMode="numeric" maxLength={5} value={f.codigo_postal} onChange={set('codigo_postal')} autoComplete="postal-code" /></Campo>
+        <Campo label="Localidad"><input value={f.localidad} onChange={set('localidad')} autoComplete="address-level2" /></Campo>
+        <Campo label="Provincia"><input value={f.provincia} onChange={set('provincia')} autoComplete="address-level1" /></Campo>
       </section>
       <p className="aviso">Los correos son las cuentas de Google con las que entráis. Para cambiarlos, habla con la asociación.</p>
       <div className="fila">

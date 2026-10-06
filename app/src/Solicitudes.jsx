@@ -15,7 +15,7 @@ function Detalle({ s }) {
         <Dato k="Padre o tutor" v={[d.nombre_padre, d.correo_padre].filter(Boolean).join(' · ')} />
         <Dato k="Madre o tutora" v={[d.nombre_madre, d.correo_madre].filter(Boolean).join(' · ')} />
         <Dato k="Móvil" v={[d.movil_padre, d.movil_madre].filter(Boolean).join(' · ')} />
-        <Dato k="Dirección" v={d.direccion} />
+        <Dato k="Dirección" v={[d.direccion, [d.codigo_postal, d.localidad].filter(Boolean).join(' '), d.provincia].filter(Boolean).join(', ')} />
       </>
     )
   if (s.tipo === 'socio')
