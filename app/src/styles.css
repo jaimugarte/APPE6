@@ -459,3 +459,19 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .subbarra .contador { margin-left: 6px; }
 .subbarra.una { align-items: center; padding: 0 8px; gap: 8px; } .subbarra.una button { flex: none; text-align: left; } .subbarra.una b { font-family: var(--serif); }
 .con-barra .merienda-barra { bottom: calc(60px + env(safe-area-inset-bottom)); }
+
+/* Socios: barra fija arriba con lupa y menú de tres puntos */
+.barra-socios { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; padding: 4px 8px 4px 16px;
+  background: var(--superficie); border-bottom: 1px solid var(--linea); }
+.barra-socios h2 { margin: 0; font-size: 1.2rem; } .barra-socios h2 small { font-family: var(--sans, inherit); font-size: .8125rem; color: var(--tinta-2); font-weight: 400; }
+.barra-socios input[type=search] { flex: 1; min-height: 40px; }
+.acciones-barra { display: inline-flex; gap: 2px; }
+.icono-btn { position: relative; display: inline-grid; place-items: center; width: 44px; height: 44px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--tinta); font-size: 1.4rem; }
+.icono-btn:hover:not(:disabled) { background: var(--acento-suave); }
+.punto-rojo { position: absolute; top: 9px; right: 10px; width: 10px; height: 10px; border-radius: 50%; background: #d92d20; border: 2px solid var(--superficie); box-sizing: content-box; }
+.menu-velo { position: fixed; inset: 0; z-index: 49; }
+.menu-barra { position: absolute; top: calc(100% - 2px); right: 8px; z-index: 50; min-width: 200px; margin: 0; padding: 6px; list-style: none; background: var(--superficie); border: 1px solid var(--linea);
+  border-radius: 14px; box-shadow: 0 12px 28px -10px rgba(23, 48, 100, .35); }
+.menu-barra button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; text-align: left; color: var(--tinta); }
+.menu-barra button:hover { background: var(--acento-suave); }
+.menu-barra .vacio-menu { display: block; padding: 10px 12px; color: var(--tinta-2); }

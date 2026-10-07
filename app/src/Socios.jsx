@@ -13,7 +13,7 @@ const VACIO = {
 const desde2ESO = nivel => NIVELES.indexOf(nivel) >= NIVELES.indexOf('2º ESO')
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
 
-export default function Socios({ asoc, rol, email }) {
+export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes = null }) {
   const [socios, setSocios] = useState(null)
   const [perm, setPerm] = useState(null)
   const [misNiveles, setMisNiveles] = useState([])
@@ -22,6 +22,8 @@ export default function Socios({ asoc, rol, email }) {
   const [estado, setEstado] = useState('activos')
   const [sel, setSel] = useState(null) // null | 'nuevo' | id
   const [msg, setMsg] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [menu, setMenu] = useState(false)
 
   const esEncargado = rol === 'encargado'
   const esPreceptor = rol === 'preceptor'
@@ -81,20 +83,39 @@ export default function Socios({ asoc, rol, email }) {
   const activos = (socios || []).filter(abierto).length
 
   return (
-    <main>
-      <div className="barra">
-        <h2>Socios <small>({activos} activos de {socios.length})</small></h2>
-        {puedeEditar && (
-          <span className="fila">
-            <button onClick={() => setSel('importar')}>Importar CSV</button>
-            <button className="primario" onClick={() => setSel('nuevo')}>+ Nuevo socio</button>
-          </span>
-        )}
+    <>
+      <div className="barra-socios">
+        {buscando
+          ? <>
+            <button className="icono-btn" aria-label="Cerrar la búsqueda" onClick={() => { setBuscando(false); setQ('') }}>←</button>
+            <input type="search" autoFocus placeholder="Buscar por nombre o apellidos" value={q} onChange={e => setQ(e.target.value)} />
+          </>
+          : <>
+            <h2>Socios <small>({activos} activos)</small></h2>
+            <span className="acciones-barra">
+              <button className="icono-btn" aria-label="Buscar socio" onClick={() => { setMenu(false); setBuscando(true) }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+              </button>
+              <button className="icono-btn" aria-label={pendientes > 0 ? `Más opciones (${pendientes} solicitudes pendientes)` : 'Más opciones'} aria-expanded={menu} onClick={() => setMenu(m => !m)}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="12" cy="19" r="1.9" /></svg>
+                {pendientes > 0 && <span className="punto-rojo" aria-hidden="true" />}
+              </button>
+            </span>
+          </>}
+        {menu && <>
+        <div className="menu-velo" onClick={() => setMenu(false)} />
+        <ul className="menu-barra" role="menu">
+          {puedeEditar && <li><button role="menuitem" onClick={() => { setMenu(false); setSel('nuevo') }}>Nuevo socio</button></li>}
+          {puedeEditar && <li><button role="menuitem" onClick={() => { setMenu(false); setSel('importar') }}>Importar CSV</button></li>}
+          {onSolicitudes && <li><button role="menuitem" onClick={() => { setMenu(false); onSolicitudes() }}>Solicitudes{pendientes > 0 && <span className="contador">{pendientes}</span>}</button></li>}
+          {!puedeEditar && !onSolicitudes && <li><span className="vacio-menu">Sin más opciones</span></li>}
+        </ul>
+      </>}
       </div>
+    <main>
       {msg && <p className="error">{msg}</p>}
 
       <div className="filtros">
-        <input type="search" placeholder="Buscar por nombre o apellidos" value={q} onChange={e => setQ(e.target.value)} />
         <select value={nivel} onChange={e => setNivel(e.target.value)}>
           <option value="">Todos los niveles</option>
           {niveles.map(n => <option key={n}>{n}</option>)}
@@ -123,6 +144,7 @@ export default function Socios({ asoc, rol, email }) {
         )
       })}
     </main>
+    </>
   )
 }
 

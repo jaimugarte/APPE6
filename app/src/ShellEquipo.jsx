@@ -21,7 +21,7 @@ function SubBarra({ izq, der, valor, onCambio }) {
 }
 
 // Inicio del equipo (encargado y preceptores): barra de pestañas fija abajo, como en WhatsApp
-//   E6 (Asistencia | Estadísticas) · BD Socios (Socios | Solicitudes) · Actividades · Varios (Dineros, Herramientas…)
+//   E6 (Asistencia | Estadísticas) · Socios (con lupa y menú ⋮: Nuevo, Importar, Solicitudes) · Actividades · Varios (Dineros, Herramientas…)
 export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, pendientes, onCambio }) {
   const tiene = k => activas.some(a => a.app_clave === k)
   const asoc = mem.asociacion_id, rol = mem.rol
@@ -29,7 +29,7 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
 
   const pestanas = [
     (tiene('asistencia') || tiene('estadisticas')) && { id: 'e6', nombre: 'E6', icono: 'asistencia' },
-    (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'BD Socios', icono: 'socios', insignia: pendientes },
+    (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'Socios', icono: 'socios', insignia: pendientes },
     tiene('actividades') && { id: 'act', nombre: 'Actividades', icono: 'actividades' },
     variosApps.length > 0 && { id: 'varios', nombre: 'Varios', icono: 'varios' }
   ].filter(Boolean)
@@ -46,8 +46,7 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
 
   const e6Opc = ['asistencia', 'estadisticas'].filter(tiene)
   const e6Sel = e6Opc.includes(e6) ? e6 : e6Opc[0]
-  const bdOpc = [tiene('socios') && 'socios', conSolicitudes && 'solicitudes'].filter(Boolean)
-  const bdSel = bdOpc.includes(bd) ? bd : bdOpc[0]
+  const bdSel = !tiene('socios') ? 'solicitudes' : bd
   const appVarios = variosApps.find(a => a.app_clave === varios)
 
   return (
@@ -59,9 +58,11 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
       </>}
 
       {actual === 'bd' && <>
-        {bdOpc.length === 2 && <SubBarra izq={{ id: 'socios', etiqueta: 'Socios' }} der={{ id: 'solicitudes', etiqueta: 'Solicitudes', insignia: pendientes }} valor={bdSel} onCambio={setBd} />}
-        {bdSel === 'socios' && <Socios asoc={asoc} rol={rol} email={email} />}
-        {bdSel === 'solicitudes' && <Solicitudes onCambio={onCambio} />}
+        {bdSel === 'socios' && <Socios asoc={asoc} rol={rol} email={email} pendientes={conSolicitudes ? pendientes : 0} onSolicitudes={conSolicitudes ? () => setBd('solicitudes') : null} />}
+        {bdSel === 'solicitudes' && <>
+          {tiene('socios') && <div className="subbarra una"><button onClick={() => setBd('socios')}>← Socios</button><b>Solicitudes</b></div>}
+          <Solicitudes onCambio={onCambio} />
+        </>}
       </>}
 
       {actual === 'act' && <Actividades asoc={asoc} rol={rol} email={email} />}
