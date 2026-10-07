@@ -244,7 +244,7 @@ function Merienda({ asoc }) {
           return (
             <div key={s.id} className={'merienda-fila' + (n ? ' con' : '')}>
               <span><b>{nombreCompleto(s)}</b><small>{s.nivel}</small></span>
-              <span className="contador">
+              <span className="stepper">
                 <button aria-label={`Quitar una merienda a ${s.nombre}`} disabled={!n} onClick={() => mover(s.id, -1)}>−</button>
                 <output aria-live="polite">{n}</output>
                 <button aria-label={`Añadir una merienda a ${s.nombre}`} onClick={() => mover(s.id, 1)}>+</button>

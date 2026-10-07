@@ -437,7 +437,25 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .merienda-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 12px; background: var(--superficie); }
 .merienda-fila.con { border-color: var(--acento-borde); background: var(--acento-suave); }
 .merienda-fila > span:first-child { display: grid; min-width: 0; } .merienda-fila small { color: var(--tinta-2); }
-.contador { display: inline-flex; align-items: center; gap: 6px; }
-.contador button { width: 46px; height: 46px; min-height: 0; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
-.contador output { min-width: 28px; text-align: center; font-weight: 700; font-size: 1.15rem; }
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper button { width: 46px; height: 46px; min-height: 0; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
+.stepper output { min-width: 28px; text-align: center; font-weight: 700; font-size: 1.15rem; }
 .merienda-barra { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; padding: 12px 16px; margin: 0 -16px; background: var(--superficie); border-top: 1px solid var(--linea); }
+
+/* Equipo: barra inferior fija (como WhatsApp) y barra fina fija arriba */
+.app.con-barra { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+.barra-inferior { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: center; background: var(--superficie); border-top: 1px solid var(--linea);
+  padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -6px 18px -12px rgba(23, 48, 100, .3); }
+.barra-inferior button { flex: 1; max-width: 220px; display: grid; justify-items: center; gap: 2px; min-height: 60px; padding: 8px 4px 6px; border: 0; border-radius: 0; background: transparent;
+  color: var(--tinta-2); font-size: .75rem; }
+.barra-inferior button.on { color: var(--acento); font-weight: 700; }
+.barra-inferior .ico { position: relative; display: grid; place-items: center; width: 52px; height: 30px; border-radius: 999px; }
+.barra-inferior button.on .ico { background: var(--acento-suave); }
+.barra-inferior .contador { position: absolute; top: -4px; right: 0; margin: 0; min-width: 18px; height: 18px; font-size: .6875rem; }
+.subbarra { position: sticky; top: 0; z-index: 30; display: flex; background: var(--superficie); border-bottom: 1px solid var(--linea); }
+.subbarra button { flex: 1; min-height: 38px; padding: 4px 12px; border: 0; border-radius: 0; background: transparent; color: var(--tinta-2); font-size: .875rem; border-bottom: 2px solid transparent; }
+.subbarra button.on { color: var(--acento); font-weight: 600; border-bottom-color: var(--acento); }
+.subbarra button:first-child { text-align: left; } .subbarra button:last-child { text-align: right; }
+.subbarra .contador { margin-left: 6px; }
+.subbarra.una { align-items: center; padding: 0 8px; gap: 8px; } .subbarra.una button { flex: none; text-align: left; } .subbarra.una b { font-family: var(--serif); }
+.con-barra .merienda-barra { bottom: calc(60px + env(safe-area-inset-bottom)); }

@@ -1,22 +1,14 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase, DEMO } from './supabase'
 import Admin from './Admin'
 import Ajustes from './Ajustes'
-import Socios from './Socios'
-import Asistencia from './Asistencia'
 import { Logo, IconoApp } from './iconos'
 import { useFotoUrl } from './foto'
 import FormularioAlta from './FormularioAlta'
-import Solicitudes from './Solicitudes'
 import FamiliaHijos from './FamiliaHijos'
 import FamiliaCuotas from './FamiliaCuotas'
-import Actividades from './Actividades'
-import Herramientas from './Herramientas'
-import Dineros from './Dineros'
+import ShellEquipo from './ShellEquipo'
 import HubFamilia from './HubFamilia'
-
-// ECharts pesa bastante: solo se descarga al abrir Estadísticas
-const Estadisticas = lazy(() => import('./Estadisticas'))
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -132,9 +124,10 @@ export default function App() {
   // Solicitudes no es una app del catálogo: solo quien puede aprobar. Las familias ven el estado en su inicio.
   const esFamilia = mem?.rol === 'familia'
   const conSolicitudes = !!mem && aprueba
+  const esEquipo = !!mem && !esFamilia
 
   return (
-    <div className="app">
+    <div className={'app' + (esEquipo ? ' con-barra' : '')}>
       {DEMO && <div className="demo">Modo demo con datos de ejemplo. Se reinician al recargar la página.</div>}
       <header className="cabecera">
         <div className="cabecera-in">
@@ -163,7 +156,13 @@ export default function App() {
       )}
       {vista === 'hijos' && esFamilia && <FamiliaHijos onCambio={() => { cargar(); setVersion(v => v + 1) }} />}
       {vista === 'cuotas' && esFamilia && <FamiliaCuotas />}
-      {vista === 'hub' && !esFamilia && (
+      {esEquipo && (
+        <div hidden={vista !== 'hub'}>
+          <ShellEquipo activas={activas} mem={mem} email={session.user.email} uid={session.user.id}
+            conSolicitudes={conSolicitudes} pendientes={pendientes} onCambio={cargar} />
+        </div>
+      )}
+      {vista === 'hub' && !esFamilia && !esEquipo && (
         <main>
           <h1 className="solo-lectores">Apps de la asociación</h1>
           {fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${mem?.asociaciones?.nombre || 'la asociación'}`} />}
@@ -198,21 +197,8 @@ export default function App() {
           </div>
         </main>
       )}
-      {vista === 'app' && abierta?.app_clave === 'socios' &&
-        <Socios asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta?.app_clave === 'asistencia' &&
-        <Asistencia asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta?.app_clave === 'estadisticas' &&
-        <Suspense fallback={<main><p>Cargando…</p></main>}>
-          <Estadisticas asoc={mem.asociacion_id} rol={mem.rol} />
-        </Suspense>}
-      {vista === 'app' && abierta?.app_clave === 'actividades' &&
-        <Actividades asoc={mem.asociacion_id} rol={mem.rol} email={session.user.email} />}
-      {vista === 'app' && abierta?.app_clave === 'herramientas' && !esFamilia && <Herramientas />}
-      {vista === 'app' && abierta?.app_clave === 'dineros' && !esFamilia && <Dineros asoc={mem.asociacion_id} rol={mem.rol} uid={session.user.id} />}
-      {vista === 'app' && abierta && !['socios', 'asistencia', 'estadisticas', 'actividades', 'herramientas', 'dineros'].includes(abierta.app_clave) &&
+      {vista === 'app' && abierta && esFamilia &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
-      {vista === 'solicitudes' && conSolicitudes && <Solicitudes onCambio={cargar} />}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}
