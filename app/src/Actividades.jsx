@@ -30,8 +30,9 @@ const diaCompleto = iso => {
 // Las familias ven los planes de los niveles de sus hijos; el encargado y los preceptores con permiso de edición los crean.
 export default function Actividades({ asoc, rol, email }) {
   const hoyIso = hoy()
-  const per = 'mensual'
-  const [inicio, setInicio] = useState(inicioPeriodo(hoyIso, per))
+  const [vista, setVista] = useState('semana')   // por defecto, la semana
+  const per = vista === 'semana' ? 'semanal' : 'mensual'
+  const [inicio, setInicio] = useState(inicioPeriodo(hoyIso, 'semanal'))
   const [sel, setSel] = useState(hoyIso)
   const [filtro, setFiltro] = useState('')
   const [planes, setPlanes] = useState(null)
@@ -80,9 +81,13 @@ export default function Actividades({ asoc, rol, email }) {
   const puedeEditar = p => puedeCrear && (todosNiveles || (p.niveles.length > 0 && p.niveles.every(n => misNiveles.includes(n))))
 
   // Al cambiar de periodo se selecciona hoy (si está dentro) o el primer día
-  const irA = ini => {
+  const irA = (ini, pr = per) => {
     setInicio(ini)
-    setSel(inicioPeriodo(hoyIso, per) === ini ? hoyIso : ini)
+    setSel(inicioPeriodo(hoyIso, pr) === ini ? hoyIso : ini)
+  }
+  const cambiarVista = () => {
+    const v = vista === 'semana' ? 'mes' : 'semana', pr = v === 'semana' ? 'semanal' : 'mensual'
+    setVista(v); irA(inicioPeriodo(sel || hoyIso, pr), pr)
   }
   const mover = n => irA(sumarPeriodos(inicio, per, n))
 
@@ -99,22 +104,23 @@ export default function Actividades({ asoc, rol, email }) {
   const nivelesEnUso = ordenarNiveles([...new Set((planes || []).flatMap(p => p.niveles))])
   const hayGenerales = (planes || []).some(p => !p.niveles.length)
   const delSel = sel ? delDia(sel) : []
-  const huecos = (deIso(desde).getDay() + 6) % 7
-  const maxChips = 3
+  const huecos = vista === 'mes' ? (deIso(desde).getDay() + 6) % 7 : 0
+  const maxChips = vista === 'mes' ? 3 : 99
   const apuntadosDe = id => (familia ? apuntes.aforo[id] || 0 : inscritos.filter(i => i.plan_id === id).length)
 
   return (
-    <main className="actividades calendario-mes">
+    <main className={'actividades calendario-mes ' + vista}>
       <h1 className="solo-lectores">Calendario</h1>
       {msg && <p className="error">{msg}</p>}
 
       <div className="barra-act">
         <div className="nav-per">
-          <button aria-label="Mes anterior" onClick={() => mover(-1)}>‹</button>
+          <button aria-label={vista === 'semana' ? 'Semana anterior' : 'Mes anterior'} onClick={() => mover(-1)}>‹</button>
           <b>{etiquetaPeriodoCorta(inicio, per, hoyIso)}</b>
-          <button aria-label="Mes siguiente" onClick={() => mover(1)}>›</button>
+          <button aria-label={vista === 'semana' ? 'Semana siguiente' : 'Mes siguiente'} onClick={() => mover(1)}>›</button>
           {!esActual && <button className="mini" onClick={() => irA(inicioPeriodo(hoyIso, per))}>Hoy</button>}
         </div>
+        <button className="mini enlace-vista" onClick={cambiarVista}>{vista === 'semana' ? 'Ver por mes' : 'Ver por semana'}</button>
       </div>
 
       {nivelesEnUso.length > 0 && (
@@ -132,7 +138,35 @@ export default function Actividades({ asoc, rol, email }) {
 
       {planes === null && <p>Cargando…</p>}
 
-      {planes && (
+      {planes && vista === 'semana' && (
+        <div className="semana-lista" role="list" aria-label="Calendario de la semana">
+          {dias.map(iso => {
+            const l = delDia(iso)
+            const d = deIso(iso)
+            return (
+              <button key={iso} role="listitem" aria-current={iso === sel ? 'date' : undefined}
+                className={'dia-fila' + (iso === hoyIso ? ' hoy' : '') + (iso === sel ? ' sel' : '')} onClick={() => setSel(iso)}>
+                <span className="dia-et"><small>{DIAS_CORTOS[(d.getDay() + 6) % 7]}</small><b>{d.getDate()}</b></span>
+                <span className="dia-planes">
+                  {l.length === 0 && <span className="vacio-dia">—</span>}
+                  {l.map(p => {
+                    const n = apuntadosDe(p.id)
+                    const c = familia ? '' : cuenta(n, p.limite)
+                    return (
+                      <span key={p.id} className="ev" style={{ '--c': colorPlan(p) }}>
+                        <span className="ev-t">{p.titulo}{p.hora_inicio ? <small> {hora(p.hora_inicio)}</small> : null}</span>
+                        {c && <b className={'ev-n' + (p.limite != null && n > p.limite ? ' rojo' : '')}>{c}</b>}
+                      </span>
+                    )
+                  })}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {planes && vista === 'mes' && (
         <div className="cal-plan mes" role="grid" aria-label="Calendario del mes">
           {DIAS_CORTOS.map(d => <span key={d} className="cab" aria-hidden="true">{d}</span>)}
           {Array.from({ length: huecos }, (_, i) => <span key={'v' + i} className="hueco" />)}

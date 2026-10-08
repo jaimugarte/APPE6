@@ -515,3 +515,27 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .furgo-card.inactiva { opacity: .65; }
 .reservas { margin: 6px 0 0; padding-left: 18px; font-size: .875rem; }
 .inscritos .chips { margin: 6px 0; }
+
+/* Vista semanal por defecto: una fila por día, con los planes legibles */
+.calendario-mes .barra-act { justify-content: space-between; margin-bottom: 6px; flex-wrap: nowrap; }
+.calendario-mes .nav-per { gap: 2px; }
+.calendario-mes .nav-per button { min-height: 30px; min-width: 30px; padding: 0 8px; }
+.calendario-mes .nav-per b { min-width: 0; padding: 0 4px; font-size: .85rem; white-space: nowrap; }
+.calendario-mes .mini { min-height: 28px; padding: 0 10px; font-size: .78rem; }
+.enlace-vista { border: 0; background: transparent; color: var(--acento); font-weight: 600; white-space: nowrap; }
+.semana-lista { display: grid; gap: 4px; margin-bottom: 14px; }
+.dia-fila { display: flex; align-items: stretch; gap: 10px; width: 100%; min-height: max(56px, calc((100dvh - 440px) / 7)); padding: 6px 8px; text-align: left;
+  border: 1px solid var(--linea); border-radius: 10px; background: var(--superficie); }
+.dia-fila.sel { border-color: var(--acento); box-shadow: inset 0 0 0 1px var(--acento); background: var(--acento-suave); }
+.dia-et { flex: none; display: grid; align-content: center; justify-items: center; width: 34px; color: var(--tinta-3); }
+.dia-et b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: .95rem; color: var(--tinta); }
+.dia-fila.hoy .dia-et b { background: var(--acento); color: #fff; }
+.dia-planes { flex: 1; min-width: 0; display: grid; gap: 3px; align-content: center; }
+.dia-planes .ev { font-size: .8rem; padding: 3px 7px; }
+.dia-planes .ev-t small { color: var(--tinta-3); }
+.vacio-dia { color: var(--linea); }
+@media (max-width: 639px) {
+  .dia-planes .ev { width: 100%; height: auto; padding: 3px 7px; border: 0; border-left: 3px solid var(--c); border-radius: 4px; background: color-mix(in srgb, var(--c) 16%, #fff); font-size: .8rem; color: var(--tinta); justify-content: space-between; }
+  .dia-planes .ev-t { display: block; }
+  .dia-planes .ev-n { font-size: .75rem; }
+}
