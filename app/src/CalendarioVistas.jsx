@@ -3,7 +3,8 @@ import { NIVELES, deIso } from './util'
 import { colorNivel, colorPlan, fondoPlan, COLOR_TODOS, GRUPOS_NIVEL } from './coloresNivel'
 
 const DIAS_CORTOS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-const ALTO_H = 40   // píxeles por hora
+const ALTO_MIN = 14, ALTO_MAX = 80, ALTO_DEF = 26   // píxeles por hora (se ajusta pellizcando con dos dedos)
+const leerAlto = () => { try { const v = Number(localStorage.getItem('cal-alto')); return v >= ALTO_MIN && v <= ALTO_MAX ? v : ALTO_DEF } catch { return ALTO_DEF } }
 const aMin = h => { const [a, b] = h.slice(0, 5).split(':').map(Number); return a * 60 + b }
 
 // Menú (tres barritas): cambiar de vista y elegir qué calendarios se ven (por nivel, Club o Sr)
@@ -84,6 +85,23 @@ function carriles(lista) {
 
 // Semana como en Google Calendar: columna fina con las horas a la izquierda, siete días, franja superior para planes sin hora o de varios días
 export function SemanaHoras({ dias, delDia, sel, hoyIso, onDia, onPlan, cuentaDe }) {
+  const [ALTO_H, setAlto] = useState(leerAlto)
+  const caja = useRef(null)
+  const altoRef = useRef(ALTO_H); altoRef.current = ALTO_H
+  // Pellizcar con dos dedos (o Ctrl + rueda) para comprimir o extender la altura de las horas
+  useEffect(() => {
+    const el = caja.current; if (!el) return
+    let base = null
+    const fijar = v => { const a = Math.round(Math.min(ALTO_MAX, Math.max(ALTO_MIN, v))); setAlto(a); try { localStorage.setItem('cal-alto', String(a)) } catch { /* sin almacenamiento */ } }
+    const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const ini = e => { base = e.touches.length === 2 ? { d: dist(e.touches), a: altoRef.current } : null }
+    const mov = e => { if (e.touches.length === 2 && base) { e.preventDefault(); fijar(base.a * dist(e.touches) / base.d) } }
+    const fin = () => { base = null }
+    const rueda = e => { if (e.ctrlKey) { e.preventDefault(); fijar(altoRef.current * (e.deltaY < 0 ? 1.1 : 0.9)) } }
+    el.addEventListener('touchstart', ini, { passive: true }); el.addEventListener('touchmove', mov, { passive: false })
+    el.addEventListener('touchend', fin); el.addEventListener('wheel', rueda, { passive: false })
+    return () => { el.removeEventListener('touchstart', ini); el.removeEventListener('touchmove', mov); el.removeEventListener('touchend', fin); el.removeEventListener('wheel', rueda) }
+  }, [])
   const conHora = p => p.hora_inicio && p.fecha === p.fecha_fin
   const todos = dias.flatMap(delDia)
   const horas = todos.filter(conHora)
@@ -98,7 +116,7 @@ export function SemanaHoras({ dias, delDia, sel, hoyIso, onDia, onPlan, cuentaDe
   const minAhora = ahora.getHours() * 60 + ahora.getMinutes()
 
   return (
-    <div className="semana-g" role="grid" aria-label="Calendario de la semana">
+    <div className="semana-g" ref={caja} role="grid" aria-label="Calendario de la semana">
       <div className="sg-cab">
         <span className="sg-esq" />
         {dias.map(iso => {
@@ -142,7 +160,7 @@ export function SemanaHoras({ dias, delDia, sel, hoyIso, onDia, onPlan, cuentaDe
                 const c = cuentaDe(p)
                 return (
                   <button key={p.id} className="sg-ev" aria-label={p.titulo}
-                    style={{ top: ((ini - h0 * 60) / 60) * ALTO_H, height: Math.max(((fin - ini) / 60) * ALTO_H - 1, 18),
+                    style={{ top: ((ini - h0 * 60) / 60) * ALTO_H, height: Math.max(((fin - ini) / 60) * ALTO_H - 1, 16),
                       left: `${(carril / n) * 100}%`, width: `${100 / n}%`, background: fondoPlan(p), borderColor: colorPlan(p) }}
                     onClick={e => { e.stopPropagation(); onDia(iso); onPlan(p) }}>
                     <span>{p.titulo}</span>

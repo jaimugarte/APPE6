@@ -164,3 +164,5 @@ El logo es la mascota de la asociación (`app/public/`): `icon-192.png` y `icon-
 **Vista por defecto del calendario**: la semana (una fila por día, con los planes legibles). Encima, flechas para cambiar de semana, «Hoy» cuando no estás en la actual, y a la derecha un enlace pequeño «Ver por mes» / «Ver por semana».
 
 **Semana tipo Google Calendar**: columna fina de horas a la izquierda, siete días y una franja superior «día» para los planes sin hora o de varios días; los planes con hora se colocan en su hueco (los que se solapan van en carriles) y llevan el color de fondo de su nivel (franjas si son para varios). Las tres barritas de arriba a la izquierda abren el menú: cambiar entre Semana y Mes y elegir qué calendarios ver (niveles sueltos, «Club» 5º EP–2º ESO, «Sr» 3º ESO–2º Bach., «Mis niveles», «Todos» y «Para todos los niveles»). Por defecto, el preceptor ve solo los planes de sus niveles; el encargado y las familias, todos.
+
+**Altura de la semana**: más compacta por defecto; con dos dedos (pellizco) o Ctrl + rueda se comprime o extiende la altura de las horas, y se recuerda en ese dispositivo.
