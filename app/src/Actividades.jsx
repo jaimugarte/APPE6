@@ -3,7 +3,8 @@ import { supabase } from './supabase'
 import { NIVELES, hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodoCorta, deIso, aIso } from './util'
 import { eur } from './cuotas'
 import { TIPOS_ACT, etiquetaTipo } from './tiposActividad'
-import { colorNivel, colorPlan, ordenarNiveles, pasaFiltro, COLOR_TODOS } from './coloresNivel'
+import { colorNivel, colorPlan, fondoPlan, ordenarNiveles, COLOR_TODOS } from './coloresNivel'
+import { MenuCalendario, SemanaHoras } from './CalendarioVistas'
 import { useApuntes, ApuntarHijos, Plazas } from './PlanesFamilia'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -34,7 +35,8 @@ export default function Actividades({ asoc, rol, email }) {
   const per = vista === 'semana' ? 'semanal' : 'mensual'
   const [inicio, setInicio] = useState(inicioPeriodo(hoyIso, 'semanal'))
   const [sel, setSel] = useState(hoyIso)
-  const [filtro, setFiltro] = useState('')
+  const [nivSel, setNivSel] = useState(undefined)   // undefined = el valor por defecto; null = todos; si no, lista de niveles
+  const [generales, setGenerales] = useState(true)   // planes para todos los niveles
   const [planes, setPlanes] = useState(null)
   const [perm, setPerm] = useState(null)
   const [misNiveles, setMisNiveles] = useState([])
@@ -85,8 +87,8 @@ export default function Actividades({ asoc, rol, email }) {
     setInicio(ini)
     setSel(inicioPeriodo(hoyIso, pr) === ini ? hoyIso : ini)
   }
-  const cambiarVista = () => {
-    const v = vista === 'semana' ? 'mes' : 'semana', pr = v === 'semana' ? 'semanal' : 'mensual'
+  const cambiarVista = v => {
+    const pr = v === 'semana' ? 'semanal' : 'mensual'
     setVista(v); irA(inicioPeriodo(sel || hoyIso, pr), pr)
   }
   const mover = n => irA(sumarPeriodos(inicio, per, n))
@@ -95,14 +97,15 @@ export default function Actividades({ asoc, rol, email }) {
     socios={socios} inscritos={inscritos.filter(i => i.plan_id === editando.id)}
     onVolver={() => setEditando(null)} onGuardado={() => { setEditando(null); cargar() }} onInscritos={cargar} />
 
-  const visibles = (planes || []).filter(p => pasaFiltro(p, filtro))
+  // Por defecto, el preceptor ve solo los planes de sus niveles; el resto ve todos
+  const nivEf = nivSel === undefined ? (rol === 'preceptor' && misNiveles.length ? misNiveles : null) : nivSel
+  const pasa = p => (p.niveles.length ? nivEf === null || p.niveles.some(n => nivEf.includes(n)) : generales)
+  const visibles = (planes || []).filter(pasa)
   // Un plan de varios días aparece en todos los días que abarca
   const delDia = iso => visibles.filter(p => p.fecha <= iso && p.fecha_fin >= iso)
   const dias = []
   for (let d = deIso(desde); aIso(d) <= hasta; d.setDate(d.getDate() + 1)) dias.push(aIso(d))
   const esActual = inicio === inicioPeriodo(hoyIso, per)
-  const nivelesEnUso = ordenarNiveles([...new Set((planes || []).flatMap(p => p.niveles))])
-  const hayGenerales = (planes || []).some(p => !p.niveles.length)
   const delSel = sel ? delDia(sel) : []
   const huecos = vista === 'mes' ? (deIso(desde).getDay() + 6) % 7 : 0
   const maxChips = vista === 'mes' ? 3 : 99
@@ -114,56 +117,22 @@ export default function Actividades({ asoc, rol, email }) {
       {msg && <p className="error">{msg}</p>}
 
       <div className="barra-act">
+        <MenuCalendario vista={vista} onVista={cambiarVista} niveles={nivEf} generales={generales}
+          onNiveles={setNivSel} onGenerales={setGenerales} misNiveles={rol === 'preceptor' ? misNiveles : []} opciones={NIVELES} />
         <div className="nav-per">
           <button aria-label={vista === 'semana' ? 'Semana anterior' : 'Mes anterior'} onClick={() => mover(-1)}>‹</button>
           <b>{etiquetaPeriodoCorta(inicio, per, hoyIso)}</b>
           <button aria-label={vista === 'semana' ? 'Semana siguiente' : 'Mes siguiente'} onClick={() => mover(1)}>›</button>
           {!esActual && <button className="mini" onClick={() => irA(inicioPeriodo(hoyIso, per))}>Hoy</button>}
         </div>
-        <button className="mini enlace-vista" onClick={cambiarVista}>{vista === 'semana' ? 'Ver por mes' : 'Ver por semana'}</button>
       </div>
-
-      {nivelesEnUso.length > 0 && (
-        <div className="filtro-nivel" role="group" aria-label="Filtrar por nivel">
-          <button className={'fn' + (filtro === '' ? ' on' : '')} aria-pressed={filtro === ''} onClick={() => setFiltro('')}>Todos</button>
-          {nivelesEnUso.map(n => (
-            <button key={n} className={'fn' + (filtro === n ? ' on' : '')} aria-pressed={filtro === n}
-              style={{ '--c': colorNivel(n) }} onClick={() => setFiltro(filtro === n ? '' : n)}>
-              <i />{n}
-            </button>
-          ))}
-          {hayGenerales && <span className="fn-leyenda" style={{ '--c': COLOR_TODOS }}><i />Todos los niveles</span>}
-        </div>
-      )}
 
       {planes === null && <p>Cargando…</p>}
 
       {planes && vista === 'semana' && (
-        <div className="semana-lista" role="list" aria-label="Calendario de la semana">
-          {dias.map(iso => {
-            const l = delDia(iso)
-            const d = deIso(iso)
-            return (
-              <button key={iso} role="listitem" aria-current={iso === sel ? 'date' : undefined}
-                className={'dia-fila' + (iso === hoyIso ? ' hoy' : '') + (iso === sel ? ' sel' : '')} onClick={() => setSel(iso)}>
-                <span className="dia-et"><small>{DIAS_CORTOS[(d.getDay() + 6) % 7]}</small><b>{d.getDate()}</b></span>
-                <span className="dia-planes">
-                  {l.length === 0 && <span className="vacio-dia">—</span>}
-                  {l.map(p => {
-                    const n = apuntadosDe(p.id)
-                    const c = familia ? '' : cuenta(n, p.limite)
-                    return (
-                      <span key={p.id} className="ev" style={{ '--c': colorPlan(p) }}>
-                        <span className="ev-t">{p.titulo}{p.hora_inicio ? <small> {hora(p.hora_inicio)}</small> : null}</span>
-                        {c && <b className={'ev-n' + (p.limite != null && n > p.limite ? ' rojo' : '')}>{c}</b>}
-                      </span>
-                    )
-                  })}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <SemanaHoras dias={dias} delDia={delDia} sel={sel} hoyIso={hoyIso} onDia={setSel}
+          onPlan={() => setTimeout(() => document.querySelector('.detalle-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)}
+          cuentaDe={p => { if (familia) return null; const n = apuntadosDe(p.id); const t = cuenta(n, p.limite); return t ? { texto: t, rojo: p.limite != null && n > p.limite } : null }} />
       )}
 
       {planes && vista === 'mes' && (
@@ -183,7 +152,7 @@ export default function Actividades({ asoc, rol, email }) {
                     const c = familia ? '' : cuenta(n, p.limite)
                     const pasado = p.limite != null && n > p.limite
                     return (
-                      <span key={p.id} className="ev" style={{ '--c': colorPlan(p) }}>
+                      <span key={p.id} className="ev" style={{ '--c': colorPlan(p), background: fondoPlan(p) }}>
                         <span className="ev-t">{p.titulo}</span>
                         {c && <b className={'ev-n' + (pasado ? ' rojo' : '')}>{c}</b>}
                       </span>
@@ -202,7 +171,7 @@ export default function Actividades({ asoc, rol, email }) {
           <div className="barra">
             <h3>{diaCompleto(sel)}{sel === hoyIso && <span className="badge ok">Hoy</span>}</h3>
           </div>
-          {delSel.length === 0 && <p className="aviso">No hay planes este día{filtro ? ` para ${filtro}` : ''}.</p>}
+          {delSel.length === 0 && <p className="aviso">No hay planes este día.</p>}
           {delSel.map(p => (
             <Plan key={p.id} p={p} editable={puedeEditar(p)} onEditar={() => setEditando(p)} familia={familia}
               apuntados={apuntadosDe(p.id)} datos={apuntes}

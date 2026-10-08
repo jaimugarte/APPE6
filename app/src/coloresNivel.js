@@ -20,3 +20,18 @@ export const colorPlan = p => (p.niveles?.length ? colorNivel(ordenarNiveles(p.n
 
 // ¿Se ve el plan con este filtro de nivel? Un plan para todos los niveles se ve siempre
 export const pasaFiltro = (p, nivel) => !nivel || !p.niveles?.length || p.niveles.includes(nivel)
+
+// Fondo de un plan en el calendario: el color de su nivel (franjas si va a varios niveles; gris suave si es para todos)
+export function fondoPlan(p) {
+  const cols = p.niveles?.length ? ordenarNiveles(p.niveles).map(colorNivel) : [COLOR_TODOS]
+  const t = c => `color-mix(in srgb, ${c} 30%, #fff)`
+  if (cols.length === 1) return t(cols[0])
+  const paso = 100 / cols.length
+  return `linear-gradient(135deg, ${cols.map((c, i) => `${t(c)} ${i * paso}% ${(i + 1) * paso}%`).join(', ')})`
+}
+
+// Grupos de niveles que se eligen de un golpe en el calendario
+export const GRUPOS_NIVEL = [
+  ['Club', '5º EP – 2º ESO', ['5º primaria', '6º primaria', '1º ESO', '2º ESO']],
+  ['Sr', '3º ESO – 2º Bach.', ['3º ESO', '4º ESO', '1º Bachillerato', '2º Bachillerato']]
+]
