@@ -34,13 +34,9 @@ export function IconoApp({ clave, size = 22 }) {
 }
 
 // Marca de la app: cuatro módulos, uno más tenue (el que aún está por llegar)
-export function Logo({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="#fff">
-      <rect x="3" y="3" width="8" height="8" rx="2.5" /><rect x="13" y="3" width="8" height="8" rx="2.5" />
-      <rect x="3" y="13" width="8" height="8" rx="2.5" /><rect x="13" y="13" width="8" height="8" rx="2.5" opacity=".55" />
-    </svg>
-  )
+// Logo de la asociación (la mascota); ocupa todo el contenedor `.logo`
+export function Logo() {
+  return <img src="/icon-192.png" alt="" aria-hidden="true" width="64" height="64" style={{ width: '100%', height: '100%', display: 'block', borderRadius: 'inherit' }} />
 }
 
 export function IconoCalendario({ size = 18 }) {

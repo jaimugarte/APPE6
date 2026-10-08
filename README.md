@@ -148,3 +148,7 @@ La app «Socios» se llama ahora **Chavales**. Un chaval es **Socio** (tiene un 
 - Los no socios aparecen en Asistencia, en Dineros (merienda y saldos), en Trabajos y en las postales, y cuentan en las estadísticas de asistencia, pero **no** en «Socios activos» ni en las cuotas.
 - El preceptor puede crear chavales si el encargado le ha dado permiso de edición sobre Chavales (con «Solo su nivel», solo de sus niveles).
 - Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql` (añade `no_socio` y renombra la app).
+
+## Logo e iconos
+
+El logo es la mascota de la asociación (`app/public/`): `icon-192.png` y `icon-512.png` (esquinas redondeadas transparentes), `icon-maskable-512.png` (para Android, con margen de seguridad), `apple-touch-icon.png` y `favicon.png`. Se muestra en la cabecera, el login y el formulario de invitación, y es el icono al instalar la app. Para cambiarlo, sustituye esos cinco archivos.
