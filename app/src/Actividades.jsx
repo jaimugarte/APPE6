@@ -4,7 +4,7 @@ import { NIVELES, hoy, inicioPeriodo, sumarPeriodos, finPeriodo, etiquetaPeriodo
 import { eur } from './cuotas'
 import { TIPOS_ACT, etiquetaTipo } from './tiposActividad'
 import { colorNivel, colorPlan, fondoPlan, ordenarNiveles, COLOR_TODOS } from './coloresNivel'
-import { MenuCalendario, SemanaHoras } from './CalendarioVistas'
+import { MenuCalendario, SemanaHoras, Deslizable } from './CalendarioVistas'
 import { useApuntes, ApuntarHijos, Plazas } from './PlanesFamilia'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -128,22 +128,23 @@ export default function Actividades({ asoc, rol, email, foco }) {
         <MenuCalendario vista={vista} onVista={cambiarVista} niveles={nivEf} generales={generales}
           onNiveles={setNivSel} onGenerales={setGenerales} misNiveles={rol === 'preceptor' ? misNiveles : nivelesHijos} opciones={familia ? ordenarNiveles(nivelesHijos) : NIVELES} />
         <div className="nav-per">
-          <button aria-label={vista === 'semana' ? 'Semana anterior' : 'Mes anterior'} onClick={() => mover(-1)}>‹</button>
+          <button className="flecha" aria-label={vista === 'semana' ? 'Semana anterior' : 'Mes anterior'} onClick={() => mover(-1)}>‹</button>
           <b>{etiquetaPeriodoCorta(inicio, per, hoyIso)}</b>
-          <button aria-label={vista === 'semana' ? 'Semana siguiente' : 'Mes siguiente'} onClick={() => mover(1)}>›</button>
+          <button className="flecha" aria-label={vista === 'semana' ? 'Semana siguiente' : 'Mes siguiente'} onClick={() => mover(1)}>›</button>
           {!esActual && <button className="mini" onClick={() => irA(inicioPeriodo(hoyIso, per))}>Hoy</button>}
         </div>
       </div>
 
       {planes === null && <p>Cargando…</p>}
 
-      {planes && vista === 'semana' && (
+      {planes && <Deslizable onSwipe={mover}>
+      {vista === 'semana' && (
         <SemanaHoras dias={dias} delDia={delDia} sel={sel} hoyIso={hoyIso} onDia={setSel}
           onPlan={() => setTimeout(() => document.querySelector('.detalle-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)}
           cuentaDe={p => { const n = apuntadosDe(p.id); const t = cuenta(n, p.limite); return t ? { texto: t, rojo: p.limite != null && n > p.limite } : null }} />
       )}
 
-      {planes && vista === 'mes' && (
+      {vista === 'mes' && (
         <div className="cal-plan mes" role="grid" aria-label="Calendario del mes">
           {DIAS_CORTOS.map(d => <span key={d} className="cab" aria-hidden="true">{d}</span>)}
           {Array.from({ length: huecos }, (_, i) => <span key={'v' + i} className="hueco" />)}
@@ -173,6 +174,8 @@ export default function Actividades({ asoc, rol, email, foco }) {
           })}
         </div>
       )}
+
+      </Deslizable>}
 
       {planes && sel && (
         <section className="detalle-dia" aria-live="polite">

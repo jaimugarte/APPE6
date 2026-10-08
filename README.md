@@ -169,3 +169,5 @@ El logo es la mascota de la asociación (`app/public/`): `icon-192.png` y `icon-
 
 ## Vista de las familias
 Barra inferior fija: **Calendario** (por defecto) · **Hijos socios** (solo datos de los hijos: nivel, alergias, hucha, alta/baja) · **Cuotas** · **Ajustes** (datos de la familia: contactos y domicilio). El calendario es el mismo que el del equipo, sin edición y sin nombres que no sean los de sus hijos; sí ven cuánta gente hay apuntada (`Apuntados: n/límite`) y pueden apuntar o quitar a sus hijos. Cuando se crea un plan nuevo para el nivel de un hijo (o para todos) sale un **aviso flotante**; al tocarlo se abre la semana de ese plan en el calendario. Sin servidor de notificaciones: se comprueba al abrir la app, al volver a ella y cada minuto con la app abierta; lo ya avisado se recuerda en el dispositivo.
+
+**Cambio de semana/mes**: arrastrando el calendario hacia los lados (izquierda = siguiente, derecha = anterior), con animación. Las flechas ‹ › solo se muestran con ratón; en pantallas táctiles quedan el título del periodo y «Hoy». Sirve para el equipo y para las familias.

@@ -595,3 +595,8 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .toast-cuerpo small { color: var(--tinta-3); }
 .toast-ico { font-size: 1.3rem; }
 .toast-x { flex: none; width: 44px; min-height: 0; border: 0; border-left: 1px solid var(--linea); border-radius: 0; background: transparent; font-size: 1.4rem; color: var(--tinta-3); }
+
+/* Cambio de semana/mes arrastrando; las flechas solo se muestran con ratón */
+.deslizable { overflow: hidden; touch-action: pan-y; }
+.deslizable-in { will-change: transform; }
+@media (pointer: coarse) { .calendario-mes .nav-per .flecha { display: none; } }

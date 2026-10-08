@@ -175,3 +175,45 @@ export function SemanaHoras({ dias, delDia, sel, hoyIso, onDia, onPlan, cuentaDe
     </div>
   )
 }
+
+// Arrastrar horizontalmente para cambiar de semana o de mes (como en Google Calendar).
+// Deslizar a la izquierda avanza; a la derecha retrocede. onSwipe recibe +1 o -1.
+export function Deslizable({ onSwipe, children }) {
+  const ref = useRef(null)
+  const cb = useRef(onSwipe); cb.current = onSwipe
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    let p = null, animando = false
+    const volver = () => { el.style.transition = 'transform .15s ease-out'; el.style.transform = 'translateX(0)' }
+    const ini = e => { if (animando || e.touches.length !== 1) { p = null; return } p = { x: e.touches[0].clientX, y: e.touches[0].clientY, h: false, v: false } }
+    const mov = e => {
+      if (!p) return
+      if (e.touches.length !== 1) { if (p.h) volver(); p = null; return }   // un segundo dedo (pellizco): no es un deslizamiento
+      const dx = e.touches[0].clientX - p.x, dy = e.touches[0].clientY - p.y
+      if (!p.h && !p.v) { if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) p.h = true; else if (Math.abs(dy) > 10) p.v = true }
+      if (p.h) { el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)` }
+    }
+    const fin = e => {
+      if (!p || !p.h) { p = null; return }
+      const dx = e.changedTouches[0].clientX - p.x; p = null
+      const w = el.offsetWidth
+      if (Math.abs(dx) < Math.min(80, w * 0.25)) return volver()
+      animando = true
+      const dir = dx < 0 ? 1 : -1
+      el.style.transition = 'transform .15s ease-out'; el.style.transform = `translateX(${-dir * w}px)`
+      setTimeout(() => {
+        cb.current(dir)
+        el.style.transition = 'none'; el.style.transform = `translateX(${dir * w}px)`
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          el.style.transition = 'transform .18s ease-out'; el.style.transform = 'translateX(0)'
+          setTimeout(() => { animando = false }, 200)
+        }))
+      }, 150)
+    }
+    const cancelar = () => { if (p?.h) volver(); p = null }
+    el.addEventListener('touchstart', ini, { passive: true }); el.addEventListener('touchmove', mov, { passive: true })
+    el.addEventListener('touchend', fin); el.addEventListener('touchcancel', cancelar)
+    return () => { el.removeEventListener('touchstart', ini); el.removeEventListener('touchmove', mov); el.removeEventListener('touchend', fin); el.removeEventListener('touchcancel', cancelar) }
+  }, [])
+  return <div className="deslizable"><div ref={ref} className="deslizable-in">{children}</div></div>
+}
