@@ -5,11 +5,8 @@ import Ajustes from './Ajustes'
 import { Logo, IconoApp } from './iconos'
 import { useFotoUrl } from './foto'
 import FormularioAlta from './FormularioAlta'
-import FamiliaHijos from './FamiliaHijos'
-import FamiliaCuotas from './FamiliaCuotas'
 import ShellEquipo from './ShellEquipo'
-import HubFamilia from './HubFamilia'
-import Actividades from './Actividades'
+import ShellFamilia from './ShellFamilia'
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -128,7 +125,7 @@ export default function App() {
   const esEquipo = !!mem && !esFamilia
 
   return (
-    <div className={'app' + (esEquipo ? ' con-barra' : '')}>
+    <div className={'app' + (esEquipo || esFamilia ? ' con-barra' : '')}>
       {DEMO && <div className="demo">Modo demo con datos de ejemplo. Se reinician al recargar la página.</div>}
       <header className="cabecera">
         <div className="cabecera-in">
@@ -143,7 +140,7 @@ export default function App() {
             </div>
           </div>
           <nav>
-            <button className={vista === 'hub' || vista === 'app' || vista === 'solicitudes' || vista === 'hijos' || vista === 'cuotas' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>
+            {!esFamilia && <button className={vista === 'hub' || vista === 'app' || vista === 'solicitudes' ? 'activo' : ''} onClick={() => setVista('hub')}>Inicio</button>}
             {esEncargado && <button className={vista === 'ajustes' ? 'activo' : ''} onClick={() => setVista('ajustes')}>Ajustes</button>}
             {esAdmin && <button className={vista === 'admin' ? 'activo' : ''} onClick={() => setVista('admin')}>Admin</button>}
             <button onClick={() => supabase.auth.signOut()}>Salir</button>
@@ -151,12 +148,7 @@ export default function App() {
         </div>
       </header>
 
-      {vista === 'hub' && esFamilia && (
-        <HubFamilia fotoUrl={fotoUrl} nombre={mem?.asociaciones?.nombre} activas={activas} version={version}
-          onVista={setVista} onApp={a => { setAbierta(a); setVista('app') }} />
-      )}
-      {vista === 'hijos' && esFamilia && <FamiliaHijos onCambio={() => { cargar(); setVersion(v => v + 1) }} />}
-      {vista === 'cuotas' && esFamilia && <FamiliaCuotas />}
+      {esFamilia && <ShellFamilia activas={activas} mem={mem} email={session.user.email} onCambio={cargar} />}
       {esEquipo && (
         <div hidden={vista !== 'hub'}>
           <ShellEquipo activas={activas} mem={mem} email={session.user.email} uid={session.user.id}
@@ -198,10 +190,6 @@ export default function App() {
           </div>
         </main>
       )}
-      {vista === 'app' && abierta && esFamilia && abierta.app_clave === 'actividades' &&
-        <Actividades asoc={mem.asociacion_id} rol="familia" email={session.user.email} />}
-      {vista === 'app' && abierta && esFamilia && abierta.app_clave !== 'actividades' &&
-        <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}
       {vista === 'admin' && esAdmin && <Admin uid={session.user.id} />}

@@ -586,3 +586,12 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 
 .semana-g { touch-action: pan-y; }
 .sg-horas span { font-size: .56rem; }
+
+/* Aviso flotante de plan nuevo (familias) */
+.toast-plan { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: stretch; width: min(420px, calc(100vw - 24px));
+  border: 1px solid var(--acento-borde, var(--linea)); border-radius: 14px; background: var(--superficie); box-shadow: 0 8px 28px rgba(23, 32, 54, .28); overflow: hidden; }
+.toast-cuerpo { flex: 1; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border: 0; border-radius: 0; background: transparent; text-align: left; }
+.toast-cuerpo b, .toast-cuerpo small { display: block; }
+.toast-cuerpo small { color: var(--tinta-3); }
+.toast-ico { font-size: 1.3rem; }
+.toast-x { flex: none; width: 44px; min-height: 0; border: 0; border-left: 1px solid var(--linea); border-radius: 0; background: transparent; font-size: 1.4rem; color: var(--tinta-3); }

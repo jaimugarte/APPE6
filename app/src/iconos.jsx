@@ -20,6 +20,8 @@ export function IconoApp({ clave, size = 22 }) {
       return <svg {...p}><path d="M12 20v-8" /><path d="M12 12c0-3 2-5 5-5 0 3-2 5-5 5Z" /><path d="M12 15c0-2.5-1.8-4.2-4.5-4.2 0 2.6 1.8 4.2 4.5 4.2Z" /><path d="M6 20h12" /></svg>
     case 'dineros':
       return <svg {...p}><ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" /></svg>
+    case 'ajustes':
+      return <svg {...p}><circle cx="12" cy="12" r="3" /><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6" /></svg>
     case 'furgonetas':
       return <svg {...p}><path d="M3 16V8.5A1.5 1.5 0 0 1 4.5 7H14v9" /><path d="M14 10h3.6l2.9 3.2V16H14" /><circle cx="7.5" cy="17" r="1.8" /><circle cx="16.5" cy="17" r="1.8" /></svg>
     case 'herramientas':

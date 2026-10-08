@@ -73,40 +73,48 @@ export function ApuntarHijos({ plan, datos }) {
   )
 }
 
-// Aviso en el inicio de la familia: planes próximos a los que aún se puede apuntar a algún hijo (los creados hace poco, destacados)
-export function PlanesNuevos({ activo, version }) {
-  const datos = useApuntes(activo)
-  const [planes, setPlanes] = useState(null)
-  const [ids, setIds] = useState(null)   // los planes pendientes al abrir: no desaparecen al apuntar, para ver el «apuntado ✓»
+const CLAVE_VISTOS = 'familia-planes-vistos'
+const leerVistos = () => { try { const v = JSON.parse(localStorage.getItem(CLAVE_VISTOS)); return Array.isArray(v) ? v : null } catch { return null } }
+const guardarVistos = l => { try { localStorage.setItem(CLAVE_VISTOS, JSON.stringify(l.slice(-300))) } catch { /* sin almacenamiento */ } }
+
+// Aviso flotante cuando se crea un plan nuevo para el nivel de un hijo (o para todos). Al tocarlo lleva al plan en el calendario.
+// Sin servidor de notificaciones: se comprueba al abrir la app, al volver a ella y cada minuto mientras está abierta.
+export function AvisoPlanes({ activo, onAbrir }) {
+  const [nuevos, setNuevos] = useState([])
+  const comprobar = useCallback(async () => {
+    const { data } = await supabase.from('planes').select('id, titulo, fecha, fecha_fin, creado_en').gte('fecha_fin', hoy()).order('creado_en', { ascending: false })
+    const planes = data || []
+    let vistos = leerVistos()
+    if (vistos === null) {   // primera vez en este dispositivo: solo se avisa de lo creado en los últimos 3 días
+      const lim = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)
+      const recientes = planes.filter(p => String(p.creado_en || '') >= lim)
+      vistos = planes.filter(p => !recientes.includes(p)).map(p => p.id)
+      guardarVistos(vistos)
+    }
+    setNuevos(planes.filter(p => !vistos.includes(p.id)))
+  }, [])
   useEffect(() => {
     if (!activo) return
-    supabase.from('planes').select('*').gte('fecha_fin', hoy()).order('fecha').then(({ data }) => { setPlanes(data || []); setIds(null) })
-  }, [activo, version])
-  useEffect(() => {
-    if (ids !== null || !planes || !datos.listo) return
-    setIds(planes.filter(p => hijosElegibles(p, datos.hijos).some(h => !datos.inscr.has(`${p.id}:${h.id}`))).slice(0, 4).map(p => p.id))
-  }, [ids, planes, datos])
-  if (!activo || !planes || !ids) return null
-  const reciente = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)
-  const pendientes = ids.map(id => planes.find(p => p.id === id)).filter(Boolean)
-  if (!pendientes.length) return null
+    comprobar()
+    const t = setInterval(comprobar, 60000)
+    const vis = () => { if (document.visibilityState === 'visible') comprobar() }
+    document.addEventListener('visibilitychange', vis)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis) }
+  }, [activo, comprobar])
+
+  if (!activo || !nuevos.length) return null
+  const descartar = () => { guardarVistos([...(leerVistos() || []), ...nuevos.map(p => p.id)]); setNuevos([]) }
+  const p = nuevos[0]
   return (
-    <section className="avisos-planes" aria-label="Planes para apuntar a tus hijos">
-      <h2>Planes para apuntar</h2>
-      {pendientes.map(p => (
-        <article key={p.id} className="plan aviso-plan" style={{ '--c': colorPlan(p) }}>
-          <div className="plan-cab">
-            <b>{p.titulo}</b>
-            {(p.creado_en || '') >= reciente && <span className="badge nuevo">Nuevo</span>}
-          </div>
-          <small className="meta">
-            <span>{fechaCorta(p.fecha)}{p.fecha_fin > p.fecha ? ` – ${fechaCorta(p.fecha_fin)}` : ''}</span>
-            {p.lugar && <span>{p.lugar}</span>}
-            <Plazas plan={p} apuntados={datos.aforo[p.id]} />
-          </small>
-          <ApuntarHijos plan={p} datos={datos} />
-        </article>
-      ))}
-    </section>
+    <div className="toast-plan" role="status" aria-live="polite">
+      <button className="toast-cuerpo" onClick={() => { descartar(); onAbrir(p) }}>
+        <span className="toast-ico" aria-hidden="true">🔔</span>
+        <span>
+          <b>{nuevos.length === 1 ? 'Nuevo plan' : `${nuevos.length} planes nuevos`}</b>
+          <small>{p.titulo} · {fechaCorta(p.fecha)}{nuevos.length > 1 ? ` y ${nuevos.length - 1} más` : ''}</small>
+        </span>
+      </button>
+      <button className="toast-x" aria-label="Cerrar aviso" onClick={descartar}>×</button>
+    </div>
   )
 }

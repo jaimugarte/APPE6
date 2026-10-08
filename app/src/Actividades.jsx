@@ -29,7 +29,7 @@ const diaCompleto = iso => {
 // El equipo ve cuánta gente hay apuntada (10/20, en rojo si se supera el límite); las familias apuntan a sus hijos.
 // Cada plan lleva el color de su nivel y se puede filtrar por nivel.
 // Las familias ven los planes de los niveles de sus hijos; el encargado y los preceptores con permiso de edición los crean.
-export default function Actividades({ asoc, rol, email }) {
+export default function Actividades({ asoc, rol, email, foco }) {
   const hoyIso = hoy()
   const [vista, setVista] = useState('semana')   // por defecto, la semana
   const per = vista === 'semana' ? 'semanal' : 'mensual'
@@ -76,6 +76,13 @@ export default function Actividades({ asoc, rol, email }) {
     })()
   }, [asoc, rol, email])
 
+  // Un aviso de plan nuevo lleva a la semana de ese plan
+  useEffect(() => {
+    if (!foco?.fecha) return
+    setVista('semana'); setInicio(inicioPeriodo(foco.fecha, 'semanal')); setSel(foco.fecha)
+    setTimeout(() => document.querySelector('.detalle-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400)
+  }, [foco])
+
   // Qué puede hacer quien mira (la base de datos lo vuelve a comprobar)
   const todosNiveles = rol === 'encargado' || (rol === 'preceptor' && perm?.ambito === 'todos')
   const nivelesPosibles = todosNiveles ? NIVELES : misNiveles
@@ -109,6 +116,7 @@ export default function Actividades({ asoc, rol, email }) {
   const delSel = sel ? delDia(sel) : []
   const huecos = vista === 'mes' ? (deIso(desde).getDay() + 6) % 7 : 0
   const maxChips = vista === 'mes' ? 3 : 99
+  const nivelesHijos = familia ? [...new Set(apuntes.hijos.map(h => h.nivel).filter(Boolean))] : []
   const apuntadosDe = id => (familia ? apuntes.aforo[id] || 0 : inscritos.filter(i => i.plan_id === id).length)
 
   return (
@@ -118,7 +126,7 @@ export default function Actividades({ asoc, rol, email }) {
 
       <div className="barra-act">
         <MenuCalendario vista={vista} onVista={cambiarVista} niveles={nivEf} generales={generales}
-          onNiveles={setNivSel} onGenerales={setGenerales} misNiveles={rol === 'preceptor' ? misNiveles : []} opciones={NIVELES} />
+          onNiveles={setNivSel} onGenerales={setGenerales} misNiveles={rol === 'preceptor' ? misNiveles : nivelesHijos} opciones={familia ? ordenarNiveles(nivelesHijos) : NIVELES} />
         <div className="nav-per">
           <button aria-label={vista === 'semana' ? 'Semana anterior' : 'Mes anterior'} onClick={() => mover(-1)}>‹</button>
           <b>{etiquetaPeriodoCorta(inicio, per, hoyIso)}</b>
@@ -132,7 +140,7 @@ export default function Actividades({ asoc, rol, email }) {
       {planes && vista === 'semana' && (
         <SemanaHoras dias={dias} delDia={delDia} sel={sel} hoyIso={hoyIso} onDia={setSel}
           onPlan={() => setTimeout(() => document.querySelector('.detalle-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)}
-          cuentaDe={p => { if (familia) return null; const n = apuntadosDe(p.id); const t = cuenta(n, p.limite); return t ? { texto: t, rojo: p.limite != null && n > p.limite } : null }} />
+          cuentaDe={p => { const n = apuntadosDe(p.id); const t = cuenta(n, p.limite); return t ? { texto: t, rojo: p.limite != null && n > p.limite } : null }} />
       )}
 
       {planes && vista === 'mes' && (
@@ -149,7 +157,7 @@ export default function Actividades({ asoc, rol, email }) {
                 <span className="evs">
                   {l.slice(0, maxChips).map(p => {
                     const n = apuntadosDe(p.id)
-                    const c = familia ? '' : cuenta(n, p.limite)
+                    const c = cuenta(n, p.limite)
                     const pasado = p.limite != null && n > p.limite
                     return (
                       <span key={p.id} className="ev" style={{ '--c': colorPlan(p), background: fondoPlan(p) }}>
@@ -209,7 +217,7 @@ function Plan({ p, editable, onEditar, familia, apuntados, datos, inscritos }) {
         {p.niveles.length === 0
           ? <span className="chip nv" style={{ '--c': COLOR_TODOS }}>Todos los niveles</span>
           : ordenarNiveles(p.niveles).map(n => <span key={n} className="chip nv" style={{ '--c': colorNivel(n) }}>{n}</span>)}
-        {!familia &&
+        {
           <span className={'chip plazas' + (rojo ? ' roja' : '')}>Apuntados: {p.limite != null ? `${apuntados}/${p.limite}` : apuntados}</span>}
         {familia && <Plazas plan={p} apuntados={apuntados} />}
       </div>
