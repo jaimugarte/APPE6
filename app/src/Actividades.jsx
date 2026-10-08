@@ -209,8 +209,8 @@ function Plan({ p, editable, onEditar, familia, apuntados, datos, inscritos }) {
         {p.niveles.length === 0
           ? <span className="chip nv" style={{ '--c': COLOR_TODOS }}>Todos los niveles</span>
           : ordenarNiveles(p.niveles).map(n => <span key={n} className="chip nv" style={{ '--c': colorNivel(n) }}>{n}</span>)}
-        {!familia && (p.limite != null || apuntados > 0) &&
-          <span className={'chip plazas' + (rojo ? ' roja' : '')}>Apuntados {cuenta(apuntados, p.limite)}</span>}
+        {!familia &&
+          <span className={'chip plazas' + (rojo ? ' roja' : '')}>Apuntados: {p.limite != null ? `${apuntados}/${p.limite}` : apuntados}</span>}
         {familia && <Plazas plan={p} apuntados={apuntados} />}
       </div>
       {p.descripcion && <p className="plan-desc">{p.descripcion}</p>}
