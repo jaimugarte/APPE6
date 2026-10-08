@@ -471,3 +471,153 @@ on conflict (asociacion_id, app_clave) do update
   set permitida = asociacion_apps.permitida or excluded.permitida, activa = asociacion_apps.activa or excluded.activa;
 delete from asociacion_apps where app_clave = 'campos_trabajo';
 delete from apps where clave = 'campos_trabajo';
+
+-- ---------- FURGONETAS, LÍMITE DE PLAZAS E INSCRIPCIONES EN PLANES ----------
+-- Furgonetas: las gestiona el encargado; el equipo (encargado y preceptores) las reserva al crear un plan.
+-- Inscripciones: las familias apuntan a sus hijos desde el plan (respetando el límite); el equipo también puede apuntar (y pasarse del límite).
+insert into apps(clave, nombre, descripcion) values
+  ('furgonetas', 'Furgonetas', 'Furgonetas de la asociación y sus reservas para los planes')
+  on conflict (clave) do nothing;
+
+alter table planes add column if not exists limite integer check (limite is null or limite > 0);
+
+create table if not exists furgonetas (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  nombre text not null check (length(trim(nombre)) between 1 and 80),
+  matricula text check (length(matricula) <= 20),
+  plazas integer check (plazas is null or plazas between 1 and 99),
+  activa boolean not null default true,
+  creada_en timestamptz not null default now()
+);
+create index if not exists furgonetas_asoc on furgonetas(asociacion_id);
+
+create table if not exists plan_furgonetas (
+  plan_id uuid references planes on delete cascade,
+  furgoneta_id uuid references furgonetas on delete cascade,
+  primary key (plan_id, furgoneta_id)
+);
+create index if not exists plan_furgonetas_furg on plan_furgonetas(furgoneta_id);
+
+create table if not exists plan_inscritos (
+  plan_id uuid references planes on delete cascade,
+  socio_id uuid references socios on delete cascade,
+  creado_por uuid references perfiles default auth.uid(),
+  creado_en timestamptz not null default now(),
+  primary key (plan_id, socio_id)
+);
+create index if not exists plan_inscritos_socio on plan_inscritos(socio_id);
+
+create or replace function plan_asoc(p_plan uuid) returns uuid
+language sql stable security definer set search_path = public as $$ select asociacion_id from planes where id = p_plan $$;
+
+-- ¿Puede quien llama ver/editar este plan? (solo equipo: las familias no usan estas tablas directamente)
+create or replace function puede_plan_equipo(p_plan uuid, p_accion text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select rol_en(p.asociacion_id) in ('encargado', 'preceptor') and puede_plan(p.asociacion_id, p.niveles, p_accion)
+                   from planes p where p.id = p_plan), false) $$;
+
+alter table furgonetas enable row level security;
+drop policy if exists fu_ver on furgonetas; drop policy if exists fu_ins on furgonetas;
+drop policy if exists fu_upd on furgonetas; drop policy if exists fu_del on furgonetas;
+create policy fu_ver on furgonetas for select using (es_equipo_app(asociacion_id, 'furgonetas'));
+create policy fu_ins on furgonetas for insert with check (es_equipo_app(asociacion_id, 'furgonetas') and rol_en(asociacion_id) = 'encargado');
+create policy fu_upd on furgonetas for update using (es_equipo_app(asociacion_id, 'furgonetas') and rol_en(asociacion_id) = 'encargado')
+  with check (es_equipo_app(asociacion_id, 'furgonetas') and rol_en(asociacion_id) = 'encargado');
+create policy fu_del on furgonetas for delete using (es_equipo_app(asociacion_id, 'furgonetas') and rol_en(asociacion_id) = 'encargado');
+
+alter table plan_furgonetas enable row level security;
+drop policy if exists pf_ver on plan_furgonetas; drop policy if exists pf_ins on plan_furgonetas; drop policy if exists pf_del on plan_furgonetas;
+create policy pf_ver on plan_furgonetas for select using (puede_plan_equipo(plan_id, 'ver') and es_equipo_app(plan_asoc(plan_id), 'furgonetas'));
+create policy pf_ins on plan_furgonetas for insert with check (puede_plan_equipo(plan_id, 'editar') and es_equipo_app(plan_asoc(plan_id), 'furgonetas')
+  and (select asociacion_id from furgonetas where id = furgoneta_id) = plan_asoc(plan_id));
+create policy pf_del on plan_furgonetas for delete using (puede_plan_equipo(plan_id, 'editar'));
+
+alter table plan_inscritos enable row level security;
+drop policy if exists pi_ver on plan_inscritos; drop policy if exists pi_ins on plan_inscritos; drop policy if exists pi_del on plan_inscritos;
+create policy pi_ver on plan_inscritos for select using (puede_plan_equipo(plan_id, 'ver'));
+create policy pi_ins on plan_inscritos for insert with check (puede_plan_equipo(plan_id, 'editar') and asoc_de_socio(socio_id) = plan_asoc(plan_id));
+create policy pi_del on plan_inscritos for delete using (puede_plan_equipo(plan_id, 'editar'));
+
+-- Una furgoneta no puede estar en dos planes que coincidan en algún día
+create or replace function comprobar_furgoneta(p_plan uuid, p_furg uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare p planes; o record;
+begin
+  select * into p from planes where id = p_plan;
+  select o2.titulo, o2.fecha, o2.fecha_fin into o
+    from plan_furgonetas pf join planes o2 on o2.id = pf.plan_id
+    where pf.furgoneta_id = p_furg and pf.plan_id <> p_plan and o2.fecha <= p.fecha_fin and o2.fecha_fin >= p.fecha limit 1;
+  if o.titulo is not null then
+    raise exception 'La furgoneta «%» ya está reservada para «%» esos días', (select nombre from furgonetas where id = p_furg), o.titulo;
+  end if;
+end $$;
+
+create or replace function t_plan_furgonetas() returns trigger language plpgsql security definer set search_path = public as $$
+begin perform comprobar_furgoneta(new.plan_id, new.furgoneta_id); return new; end $$;
+drop trigger if exists t_pf_comprobar on plan_furgonetas;
+create trigger t_pf_comprobar before insert on plan_furgonetas for each row execute function t_plan_furgonetas();
+
+create or replace function t_plan_fechas() returns trigger language plpgsql security definer set search_path = public as $$
+declare r record;
+begin
+  for r in select furgoneta_id from plan_furgonetas where plan_id = new.id loop
+    perform comprobar_furgoneta(new.id, r.furgoneta_id);
+  end loop;
+  return new;
+end $$;
+drop trigger if exists t_plan_fechas on planes;
+create trigger t_plan_fechas after update of fecha, fecha_fin on planes for each row execute function t_plan_fechas();
+
+-- Furgonetas de la asociación con su disponibilidad para un rango de fechas (p_excluir = el plan que se está editando)
+create or replace function furgonetas_libres(p_desde date, p_hasta date, p_excluir uuid default null)
+returns table(id uuid, nombre text, plazas integer, ocupada boolean, ocupada_por text)
+language sql stable security definer set search_path = public as $$
+  select f.id, f.nombre, f.plazas,
+         o.titulo is not null, o.titulo
+  from furgonetas f
+  left join lateral (
+    select p.titulo from plan_furgonetas pf join planes p on p.id = pf.plan_id
+    where pf.furgoneta_id = f.id and p.id is distinct from p_excluir and p.fecha <= p_hasta and p.fecha_fin >= p_desde limit 1
+  ) o on true
+  where f.activa
+    and f.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
+    and es_equipo_app(f.asociacion_id, 'furgonetas')
+  order by f.nombre $$;
+
+-- Apuntados por plan (para todos los que ven el plan)
+create or replace function planes_aforo() returns table(plan_id uuid, apuntados bigint)
+language sql stable security definer set search_path = public as $$
+  select p.id, (select count(*) from plan_inscritos i where i.plan_id = p.id)
+  from planes p where puede_plan(p.asociacion_id, p.niveles, 'ver') $$;
+
+-- Hijos de la familia ya apuntados
+create or replace function mis_inscripciones() returns table(plan_id uuid, socio_id uuid)
+language sql stable security definer set search_path = public as $$
+  select i.plan_id, i.socio_id from plan_inscritos i
+  where exists (select 1 from familiares_socios f where f.socio_id = i.socio_id and f.email = email_actual()) $$;
+
+-- La familia apunta (o desapunta) a un hijo; respeta nivel, fecha y límite de plazas
+create or replace function apuntar_hijo(p_plan uuid, p_socio uuid, p_apuntar boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare p planes; s socios; n integer;
+begin
+  if not coalesce(es_familiar_de(p_socio), false) then raise exception 'No puedes apuntar a este chaval'; end if;
+  select * into p from planes where id = p_plan for update;
+  if p.id is null or not puede_plan(p.asociacion_id, p.niveles, 'ver') then raise exception 'Plan no disponible'; end if;
+  select * into s from socios where id = p_socio;
+  if s.asociacion_id <> p.asociacion_id then raise exception 'Plan no disponible'; end if;
+  if p.fecha_fin < current_date then raise exception 'Este plan ya ha pasado'; end if;
+  if not p_apuntar then
+    delete from plan_inscritos where plan_id = p_plan and socio_id = p_socio;
+    return;
+  end if;
+  if cardinality(p.niveles) > 0 and not (s.nivel = any(p.niveles)) then raise exception 'Este plan no es para su nivel'; end if;
+  if not (s.no_socio or exists (select 1 from periodos_alta a where a.socio_id = s.id and a.fecha_baja is null)) then
+    raise exception 'Este chaval no está activo';
+  end if;
+  if exists (select 1 from plan_inscritos where plan_id = p_plan and socio_id = p_socio) then return; end if;
+  select count(*) into n from plan_inscritos where plan_id = p_plan;
+  if p.limite is not null and n >= p.limite then raise exception 'No quedan plazas'; end if;
+  insert into plan_inscritos(plan_id, socio_id) values (p_plan, p_socio);
+end $$;

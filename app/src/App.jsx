@@ -9,6 +9,7 @@ import FamiliaHijos from './FamiliaHijos'
 import FamiliaCuotas from './FamiliaCuotas'
 import ShellEquipo from './ShellEquipo'
 import HubFamilia from './HubFamilia'
+import Actividades from './Actividades'
 
 const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia' }
 
@@ -115,7 +116,7 @@ export default function App() {
   const esAdmin = perfil?.es_admin_global
   const esEncargado = mem?.rol === 'encargado'
   // Las familias nunca ven Asistencia ni Estadísticas; sí el resto de apps (socios, anuncios, fotos…)
-  const SOLO_EQUIPO = ['asistencia', 'estadisticas', 'socios', 'herramientas', 'dineros'] // Socios lo sustituye, para ellas, su pantalla de inicio
+  const SOLO_EQUIPO = ['asistencia', 'estadisticas', 'socios', 'herramientas', 'dineros', 'furgonetas'] // Socios lo sustituye, para ellas, su pantalla de inicio
   const visible = a => esEncargado
     || (mem?.rol === 'preceptor'
       ? a.app_clave === 'herramientas' || a.app_clave === 'dineros' || !!permisos.find(p => p.app_clave === a.app_clave)?.puede_ver  // Herramientas y Dineros: todos los preceptores
@@ -197,7 +198,9 @@ export default function App() {
           </div>
         </main>
       )}
-      {vista === 'app' && abierta && esFamilia &&
+      {vista === 'app' && abierta && esFamilia && abierta.app_clave === 'actividades' &&
+        <Actividades asoc={mem.asociacion_id} rol="familia" email={session.user.email} />}
+      {vista === 'app' && abierta && esFamilia && abierta.app_clave !== 'actividades' &&
         <main><p className="aviso">«{abierta.apps.nombre}» se construirá en un próximo paso.</p></main>}
       {vista === 'ajustes' && esEncargado &&
         <Ajustes asoc={mem.asociacion_id} apps={apps} uid={session.user.id} fotoRuta={mem.asociaciones?.foto_ruta} recargar={cargar} />}

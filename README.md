@@ -152,3 +152,11 @@ La app «Socios» se llama ahora **Chavales**. Un chaval es **Socio** (tiene un 
 ## Logo e iconos
 
 El logo es la mascota de la asociación (`app/public/`): `icon-192.png` y `icon-512.png` (esquinas redondeadas transparentes), `icon-maskable-512.png` (para Android, con margen de seguridad), `apple-touch-icon.png` y `favicon.png`. Se muestra en la cabecera, el login y el formulario de invitación, y es el icono al instalar la app. Para cambiarlo, sustituye esos cinco archivos.
+
+## Calendario, furgonetas y plazas
+
+- **Calendario**: solo vista de mes, ocupando la pantalla desde arriba. No hay botón «Nueva actividad»: abajo a la derecha hay un botón redondo «+» que abre el formulario de un plan nuevo (con el día seleccionado).
+- **Límite de plazas** (opcional) en cada plan. En cada día del calendario el equipo ve `apuntados/límite` (p. ej. `10/20`); si se supera el límite se muestra en **rojo**. Sin límite se muestra solo el número de apuntados.
+- **Furgonetas**: nuevo bloque (en «Varios») que solo gestiona el **encargado** (nombre, matrícula, plazas, activar/desactivar y reservas próximas). Para activarlo, el admin global concede la app «Furgonetas» a la asociación y el encargado la activa en Ajustes. Al crear o editar un plan, el equipo (encargado y preceptores con permiso de edición) puede reservar furgonetas; las que ya están reservadas por otro plan en esas fechas aparecen deshabilitadas, y la base de datos lo vuelve a comprobar (también si se cambian las fechas de un plan). La ocupación se calcula por **días completos**.
+- **Familias**: en su inicio ven «Planes para apuntar» (una especie de notificación dentro de la app, sin push) con los planes próximos de los niveles de sus hijos, y también en el calendario de «Actividades». Pueden **apuntar o quitar a cada hijo** de su nivel; cuando se llena el plan ya no pueden apuntar. El equipo sí puede apuntar chavales aunque se supere el límite (queda en rojo) y ve la lista de apuntados.
+- Si ya tenías la base de datos montada, vuelve a ejecutar `supabase/actualizaciones.sql` (es idempotente).

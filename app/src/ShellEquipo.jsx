@@ -3,6 +3,7 @@ import { IconoApp } from './iconos'
 import Socios from './Socios'
 import Asistencia from './Asistencia'
 import Actividades from './Actividades'
+import Furgonetas from './Furgonetas'
 import Solicitudes from './Solicitudes'
 import Herramientas from './Herramientas'
 import Dineros from './Dineros'
@@ -72,7 +73,8 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
           <div className="subbarra una"><button onClick={() => setVarios(null)}>← Varios</button><b>{appVarios.apps.nombre}</b></div>
           {appVarios.app_clave === 'dineros' && <Dineros asoc={asoc} rol={rol} uid={uid} />}
           {appVarios.app_clave === 'herramientas' && <Herramientas />}
-          {!['dineros', 'herramientas'].includes(appVarios.app_clave) && <main><p className="aviso">«{appVarios.apps.nombre}» se construirá en un próximo paso.</p></main>}
+          {appVarios.app_clave === 'furgonetas' && <Furgonetas asoc={asoc} rol={rol} />}
+          {!['dineros', 'herramientas', 'furgonetas'].includes(appVarios.app_clave) && <main><p className="aviso">«{appVarios.apps.nombre}» se construirá en un próximo paso.</p></main>}
         </>
         : <main>
           <h1 className="solo-lectores">Varios</h1>

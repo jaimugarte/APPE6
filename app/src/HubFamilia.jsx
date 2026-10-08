@@ -2,6 +2,7 @@ import { IconoApp } from './iconos'
 import { hoy } from './util'
 import { eur } from './cuotas'
 import { useResumenFamilia, mesLargo, fechaCorta } from './familiaResumen'
+import { PlanesNuevos } from './PlanesFamilia'
 
 // Inicio de la familia: cajas con un resumen en vivo (hijos, cuota del mes, próximo plan)
 export default function HubFamilia({ fotoUrl, nombre, activas, version, onVista, onApp }) {
@@ -10,6 +11,7 @@ export default function HubFamilia({ fotoUrl, nombre, activas, version, onVista,
 <main>
   <h1 className="solo-lectores">Portal de la familia</h1>
   {fotoUrl && <img className="banner" src={fotoUrl} alt={`Foto de ${nombre || 'la asociación'}`} />}
+  <PlanesNuevos activo={activas.some(a => a.app_clave === 'actividades')} version={version} />
   <div className="grid">
     <button className="tarjeta" onClick={() => onVista('hijos')}>
       <span className="icono"><IconoApp clave="hijos" /></span>

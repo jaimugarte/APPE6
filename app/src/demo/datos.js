@@ -70,6 +70,7 @@ export function crearBD() {
       { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },
       { clave: 'herramientas', nombre: 'Herramientas', descripcion: 'Utilidades para el equipo: postales y más' },
       { clave: 'dineros', nombre: 'Dineros', descripcion: 'Saldos de los socios: meriendas, deudas y ahorros, y trabajos para ganar dinero' },
+      { clave: 'furgonetas', nombre: 'Furgonetas', descripcion: 'Furgonetas de la asociación y sus reservas para los planes' },
       { clave: 'anuncios', nombre: 'Anuncios', descripcion: 'Avisos y comunicados (futuro)' },
       { clave: 'fotos', nombre: 'Fotos', descripcion: 'Galería de actividades (futuro)' }
     ],
@@ -80,6 +81,7 @@ export function crearBD() {
       { asociacion_id: ASOC, app_clave: 'actividades', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'herramientas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'dineros', permitida: true, activa: true },
+      { asociacion_id: ASOC, app_clave: 'furgonetas', permitida: true, activa: true },
       { asociacion_id: ASOC, app_clave: 'anuncios', permitida: true, activa: false }
     ],
     accesos_permitidos: [
@@ -114,7 +116,7 @@ export function crearBD() {
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
       direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
-    planes: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [], hucha_movimientos: [],
+    planes: [], furgonetas: [], plan_furgonetas: [], plan_inscritos: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [], hucha_movimientos: [],
     pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
@@ -152,6 +154,13 @@ export function crearBD() {
   plan('pl-6', 20, 22, 'Curso de retiro de otoño', ['3º ESO', '4º ESO', '1º Bachillerato'], { tipo: 'curso_retiro', lugar: 'Casa de retiros', precio: 90, descripcion: 'Tres días de retiro.' })
   plan('pl-7', 16, 16, 'Convivencia de primaria', ['5º primaria', '6º primaria'], { tipo: 'convivencia', lugar: 'Albergue', precio: 30 })
   plan('pl-5', 12, 13, 'Convivencia de fin de semana', [], { tipo: 'convivencia', descripcion: 'Dos días en la casa de colonias.', lugar: 'Casa de colonias', precio: 45 })
+
+  // Límite de plazas y furgonetas de ejemplo
+    db.planes.find(x => x.id === 'pl-5').limite = 20
+  db.furgonetas.push(
+    { id: 'fg-1', asociacion_id: ASOC, nombre: 'Furgoneta blanca', matricula: '1234 KLM', plazas: 9, activa: true, creada_en: H },
+    { id: 'fg-2', asociacion_id: ASOC, nombre: 'Furgoneta roja', matricula: '5678 PQR', plazas: 7, activa: true, creada_en: H })
+  db.plan_furgonetas.push({ plan_id: 'pl-2', furgoneta_id: 'fg-1' })
 
   // ---- Socios, altas y bajas ----
   let n = 0
@@ -196,6 +205,9 @@ export function crearBD() {
     if (k >= NIVELES_ORDEN.indexOf('2º ESO'))
       db.socios_equipo.push({ socio_id: s.id, asiste_circulos: i % 3 === 0, es_catequista: i % 7 === 0 && k >= NIVELES_ORDEN.indexOf('3º ESO') })
   })
+  function deNivelTodos() { return db.socios.filter(x => db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja)) }
+  // Apuntados de ejemplo: 14 a la convivencia de fin de semana (límite 20)
+  deNivelTodos().slice(0, 14).forEach(x => db.plan_inscritos.push({ plan_id: 'pl-5', socio_id: x.id, creado_por: null, creado_en: H }))
   // ---- Campos de trabajo de ejemplo ----
   const deNivel = (...ns) => db.socios.filter(x => ns.includes(x.nivel) && db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja))
   const campo = (id, nombre, dias, resp, descripcion, socios, importe) => {

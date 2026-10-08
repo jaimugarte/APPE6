@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], socios_equipo: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], hucha_movimientos: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], furgonetas: ['id'], plan_furgonetas: ['plan_id', 'furgoneta_id'], plan_inscritos: ['plan_id', 'socio_id'], hucha_movimientos: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
 }
 
 const REL = {
@@ -139,6 +139,20 @@ export function crearClienteDemo() {
     return niveles.length > 0 && niveles.every(n => mios.includes(n))
   }
 
+  // Furgonetas y apuntados: solo el equipo (encargado/preceptor) con acceso al plan; las familias usan rpc
+  const planDe = id => db.planes.find(x => x.id === id)
+  const puedePlanEquipo = (u, plan, accion) => !!u && !!plan && (u.rol === 'encargado' || u.rol === 'preceptor') && puedePlan(u, plan.asociacion_id, plan.niveles, accion)
+  const furgoDe = id => db.furgonetas.find(x => x.id === id)
+  const solapa = (a, b) => a.fecha <= b.fecha_fin && a.fecha_fin >= b.fecha
+  // Devuelve el mensaje de error si alguna furgoneta del plan está reservada por otro plan esos días
+  const conflictoFurgoneta = (plan, furgId) => {
+    const o = db.plan_furgonetas.filter(x => x.furgoneta_id === furgId && x.plan_id !== plan.id)
+      .map(x => planDe(x.plan_id)).find(q => q && solapa(q, plan))
+    return o ? `La furgoneta «${furgoDe(furgId)?.nombre}» ya está reservada para «${o.titulo}» esos días` : null
+  }
+  const apuntados = planId => db.plan_inscritos.filter(x => x.plan_id === planId).length
+  const socioActivo = s => !!s.no_socio || db.periodos_alta.some(p => p.socio_id === s.id && !p.fecha_baja)
+
   function visible(tabla, r) {
     const u = ctx(); if (!u) return false
     switch (tabla) {
@@ -165,6 +179,9 @@ export function crearClienteDemo() {
       case 'pagos_cuota': { const f = db.familias.find(x => x.id === r.familia_id); return !!f && f.asociacion_id === u.asoc && (u.rol === 'encargado' || f.emails.includes(u.email)) }
       case 'config_cuotas': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'ver')
+      case 'furgonetas': return esEquipoApp(u, r.asociacion_id, 'furgonetas')
+      case 'plan_furgonetas': return appActiva(u, 'furgonetas') && puedePlanEquipo(u, planDe(r.plan_id), 'ver')
+      case 'plan_inscritos': return puedePlanEquipo(u, planDe(r.plan_id), 'ver')
       case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
       case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id)
       case 'retiradas_campo': return esEquipo(u, r.asociacion_id)
@@ -187,6 +204,9 @@ export function crearClienteDemo() {
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
+      case 'furgonetas': return u.rol === 'encargado' && r.asociacion_id === u.asoc && appActiva(u, 'furgonetas')
+      case 'plan_furgonetas': return appActiva(u, 'furgonetas') && puedePlanEquipo(u, planDe(r.plan_id), 'editar')
+      case 'plan_inscritos': return puedePlanEquipo(u, planDe(r.plan_id), 'editar') && socioDe(r.socio_id)?.asociacion_id === planDe(r.plan_id)?.asociacion_id
       case 'campos_trabajo': return esEquipo(u, r.asociacion_id)
       case 'campo_participantes': return esEquipo(u, campoDe(r.campo_id)?.asociacion_id) && socioDe(r.socio_id)?.asociacion_id === campoDe(r.campo_id)?.asociacion_id
       case 'retiradas_campo': return u.rol === 'encargado' && esEquipo(u, r.asociacion_id)  // solo se anulan; se crean con retirar_campo
@@ -212,7 +232,9 @@ export function crearClienteDemo() {
       f.importe = Math.round(Number(f.importe) * 100) / 100 }
     if (tabla === 'campos_trabajo') { f.descripcion ??= null; f.responsable_email ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'campo_participantes') f.importe ??= 0
-    if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
+    if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.limite ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
+    if (tabla === 'furgonetas') { f.matricula ??= null; f.activa ??= true; f.creada_en ??= hoyIso }
+    if (tabla === 'plan_inscritos') { f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
     if (tabla === 'enlaces_alta') { f.token ??= (uuid() + uuid()).replaceAll('-', ''); f.activo ??= true; f.caduca_en ??= null; f.creado_en ??= hoyIso }
     return f
@@ -272,6 +294,7 @@ export function crearClienteDemo() {
     lte(c, v) { this.filtros.push(r => r[c] <= v); return this }
     order(c, { ascending = true } = {}) { this.orden.push([c, ascending]); return this }
     range(a, b) { this.rango = [a, b]; return this }
+    limit(n) { this.rango = [0, n - 1]; return this }
     single() { this.uno = 'single'; return this }
     maybeSingle() { this.uno = 'maybe'; return this }
     then(ok, ko) { return Promise.resolve().then(() => this.ejecutar()).then(ok, ko) }
@@ -301,13 +324,30 @@ export function crearClienteDemo() {
           if (!escribible(tabla, f)) return err('42501', `new row violates row-level security policy for table "${tabla}"`)
           if (tabla === 'hucha_movimientos' && (!['merienda', 'cena', 'plan', 'convivencia', 'curso_retiro', 'otro'].includes(f.categoria) || !Number.isFinite(f.importe) || f.importe === 0 || Math.abs(f.importe) >= 100000 || String(f.concepto ?? '').length > 120))
             return err('23514', 'new row for relation "hucha_movimientos" violates check constraint')
+          if (tabla === 'furgonetas' && (!String(f.nombre ?? '').trim() || !(Number(f.plazas) > 0)))
+            return err('23514', 'new row for relation "furgonetas" violates check constraint')
+          if (tabla === 'planes' && f.limite != null && !(Number(f.limite) > 0))
+            return err('23514', 'new row for relation "planes" violates check constraint')
+          if (tabla === 'plan_furgonetas') {
+            const fg = furgoDe(f.furgoneta_id)
+            if (!fg || fg.asociacion_id !== planDe(f.plan_id)?.asociacion_id) return err('42501', 'new row violates row-level security policy for table "plan_furgonetas"')
+            const c = conflictoFurgoneta(planDe(f.plan_id), f.furgoneta_id)
+            if (c) return err('P0001', c)
+          }
           if (duplicada(tabla, f)) return err('23505', `duplicate key value violates unique constraint on "${tabla}"`)
           filas.push(f); res.push(f); efectosAlInsertar(tabla, f)
         }
       } else if (this.op === 'update') {
         res = filas.filter(r => visible(tabla, r) && coincide(r) && escribible(tabla, r))
         const antes = res.map(r => ({ ...r }))
+        if (tabla === 'planes' && this.payload.limite != null && !(Number(this.payload.limite) > 0)) return err('23514', 'new row for relation "planes" violates check constraint')
         res.forEach(r => Object.assign(r, this.payload))
+        if (tabla === 'planes') {
+          for (const r of res) for (const pf of db.plan_furgonetas.filter(x => x.plan_id === r.id)) {
+            const c = conflictoFurgoneta(r, pf.furgoneta_id)
+            if (c) { res.forEach((q, i) => Object.assign(q, antes[i])); return err('P0001', c) }
+          }
+        }
         if (tabla === 'campo_participantes' && res.some(r => saldoCampo(r.socio_id) < 0)) {
           res.forEach((r, i) => Object.assign(r, antes[i]))
           return err('P0001', 'No se puede: el socio ya ha retirado más dinero del que le quedaría')
@@ -321,6 +361,9 @@ export function crearClienteDemo() {
           if (tabla === 'campos_trabajo') db.campo_participantes.push(...quitadas)
           return err('P0001', 'No se puede: el socio ya ha retirado más dinero del que le quedaría')
         }
+        if (tabla === 'planes') res.forEach(r => { db.plan_furgonetas = db.plan_furgonetas.filter(x => x.plan_id !== r.id); db.plan_inscritos = db.plan_inscritos.filter(x => x.plan_id !== r.id) })
+        if (tabla === 'furgonetas') res.forEach(r => { db.plan_furgonetas = db.plan_furgonetas.filter(x => x.furgoneta_id !== r.id) })
+        if (tabla === 'socios') res.forEach(r => { db.plan_inscritos = db.plan_inscritos.filter(x => x.socio_id !== r.id) })
         for (const r of res) { filas.splice(filas.indexOf(r), 1); efectosAlBorrar(tabla, r) }
       }
 
@@ -379,6 +422,33 @@ export function crearClienteDemo() {
     rpc: async (nombre, a = {}) => {
       const u = ctx()
       const hoyIso = new Date().toISOString().slice(0, 10)
+      if (nombre === 'furgonetas_libres') {
+        if (!u || !esEquipoApp(u, u.asoc, 'furgonetas')) return { data: [], error: null }
+        const ventana = { id: a.p_excluir ?? null, fecha: a.p_desde, fecha_fin: a.p_hasta }
+        return { data: db.furgonetas.filter(f => f.asociacion_id === u.asoc && f.activa).sort((x, y) => x.nombre.localeCompare(y.nombre, 'es')).map(f => {
+          const o = db.plan_furgonetas.filter(x => x.furgoneta_id === f.id && x.plan_id !== ventana.id).map(x => planDe(x.plan_id)).find(q => q && solapa(q, ventana))
+          return { id: f.id, nombre: f.nombre, plazas: f.plazas, ocupada: !!o, ocupada_por: o?.titulo ?? null }
+        }), error: null }
+      }
+      if (nombre === 'planes_aforo') {
+        return { data: db.planes.filter(p => visible('planes', p)).map(p => ({ plan_id: p.id, apuntados: apuntados(p.id) })), error: null }
+      }
+      if (nombre === 'mis_inscripciones') {
+        return { data: db.plan_inscritos.filter(i => u && esFamiliar(u, i.socio_id)).map(i => ({ plan_id: i.plan_id, socio_id: i.socio_id })), error: null }
+      }
+      if (nombre === 'apuntar_hijo') {
+        const s = socioDe(a.p_socio), p = planDe(a.p_plan)
+        if (!u || !s || !esFamiliar(u, s.id)) return err('P0001', 'No puedes apuntar a este chaval')
+        if (!p || !visible('planes', p) || s.asociacion_id !== p.asociacion_id) return err('P0001', 'Plan no disponible')
+        if (p.fecha_fin < hoyIso) return err('P0001', 'Este plan ya ha pasado')
+        if (!a.p_apuntar) { db.plan_inscritos = db.plan_inscritos.filter(i => !(i.plan_id === p.id && i.socio_id === s.id)); return { data: null, error: null } }
+        if (p.niveles.length && !p.niveles.includes(s.nivel)) return err('P0001', 'Este plan no es para su nivel')
+        if (!socioActivo(s)) return err('P0001', 'Este chaval no está activo')
+        if (db.plan_inscritos.some(i => i.plan_id === p.id && i.socio_id === s.id)) return { data: null, error: null }
+        if (p.limite != null && apuntados(p.id) >= p.limite) return err('P0001', 'No quedan plazas')
+        db.plan_inscritos.push({ plan_id: p.id, socio_id: s.id, creado_por: u.id, creado_en: hoyIso })
+        return { data: null, error: null }
+      }
       if (nombre === 'socios_campos') {
         if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
         return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
