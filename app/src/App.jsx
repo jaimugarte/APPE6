@@ -14,8 +14,8 @@ const ROL = { encargado: 'Encargado', preceptor: 'Preceptor', familia: 'Familia'
 
 // Qué ve cada rol en la demo, explicado para quien la prueba
 const ROLES_DEMO = [
-  ['encargado', 'Encargado', 'Gestiona socios, eventos, actividades, permisos y ajustes de la asociación.'],
-  ['preceptor', 'Preceptor', 'Ve y edita los socios de 1º y 2º ESO, según los permisos que le da el encargado.'],
+  ['encargado', 'Encargado', 'Gestiona chavales, eventos, actividades, permisos y ajustes de la asociación.'],
+  ['preceptor', 'Preceptor', 'Ve y edita los chavales de 1º y 2º ESO, según los permisos que le da el encargado.'],
   ['familia', 'Familia', 'Consulta la ficha y la asistencia de sus hijos, sin poder modificarlas.'],
   ['admin', 'Admin global', 'Crea asociaciones, concede apps y autoriza a los encargados.']
 ]

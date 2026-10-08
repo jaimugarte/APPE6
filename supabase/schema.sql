@@ -35,7 +35,7 @@ create table apps (
   descripcion text
 );
 insert into apps(clave, nombre, descripcion) values
-  ('socios',       'Socios',       'Base de datos de socios, altas y bajas'),
+  ('socios',       'Chavales',     'Base de datos de chavales: socios y no socios, altas y bajas'),
   ('asistencia',   'Asistencia',   'Registro de asistencia a eventos'),
   ('estadisticas', 'Estadísticas', 'Gráficos y paneles'),
   ('actividades',  'Actividades',  'Calendario de actividades de la asociación'),
@@ -92,6 +92,7 @@ create table preceptor_niveles (
 create table socios (
   id uuid primary key default gen_random_uuid(),
   asociacion_id uuid not null references asociaciones on delete cascade,
+  no_socio boolean not null default false,   -- chaval que participa sin ser socio (sin alta). Un socio tiene un periodo de alta abierto
   nombre text not null,
   apellidos text not null,
   fecha_nacimiento date,
@@ -997,7 +998,7 @@ create or replace function socios_campos()
 returns table(id uuid, nombre text, apellidos text, nivel text, activo boolean)
 language sql stable security definer set search_path = public as $$
   select s.id, s.nombre, s.apellidos, s.nivel,
-         exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+         (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null))
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo(s.asociacion_id)
@@ -1061,7 +1062,7 @@ language sql stable security definer set search_path = public as $$
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo_app(s.asociacion_id, 'herramientas')
-    and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+    and (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null))
   order by s.apellidos, s.nombre $$;
 
 -- ---------- DINEROS / HUCHA ----------
@@ -1157,7 +1158,7 @@ create or replace function socios_dineros()
 returns table(id uuid, nombre text, apellidos text, nivel text, activo boolean, saldo numeric)
 language sql stable security definer set search_path = public as $$
   select s.id, s.nombre, s.apellidos, s.nivel,
-         exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null),
+         (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)),
          saldo_hucha(s.id)
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())

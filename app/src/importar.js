@@ -4,9 +4,9 @@ import { NIVELES, esEmail, nivelPorNacimiento } from './util.js'
 export const COLUMNAS = [
   'nombre', 'apellidos', 'fecha_nacimiento', 'nivel', 'fecha_alta',
   'nombre_padre', 'correo_padre', 'movil_padre', 'nombre_madre', 'correo_madre', 'movil_madre',
-  'correo_socio', 'direccion', 'codigo_postal', 'localidad', 'provincia', 'alergias'
+  'correo_socio', 'direccion', 'codigo_postal', 'localidad', 'provincia', 'alergias', 'es_socio'
 ]
-const OPCIONALES = ['codigo_postal', 'localidad', 'provincia']   // las plantillas antiguas no las traen
+const OPCIONALES = ['codigo_postal', 'localidad', 'provincia', 'es_socio']   // las plantillas antiguas no las traen
 
 // Ayuda que se muestra junto a la plantilla
 export const AYUDA = {
@@ -14,7 +14,7 @@ export const AYUDA = {
   fecha_nacimiento: 'AAAA-MM-DD o DD/MM/AAAA. Obligatoria si no indicas el nivel',
   nivel: 'p. ej. 2º ESO. Si lo dejas vacío se calcula con la fecha de nacimiento',
   fecha_alta: 'Vacía = hoy', nombre_padre: '', correo_padre: 'Identifica a la familia', movil_padre: '',
-  nombre_madre: '', correo_madre: 'Identifica a la familia', movil_madre: '', correo_socio: '', direccion: 'Calle, número, piso', codigo_postal: '5 cifras', localidad: '', provincia: '', alergias: ''
+  nombre_madre: '', correo_madre: 'Identifica a la familia', movil_madre: '', correo_socio: '', direccion: 'Calle, número, piso', codigo_postal: '5 cifras', localidad: '', provincia: '', alergias: '', es_socio: 'sí (vacío) o no, si participa sin ser socio'
 }
 
 export const MAX_FILAS = 500
@@ -96,6 +96,12 @@ export function analizar(objetos, existentes, { hoyIso, nivelesPermitidos = null
       d[c] = d[c].toLowerCase()
       if (d[c] && !esEmail(d[c])) errores.push(`${c} no es un correo válido`)
     }
+    {
+      const v = d.es_socio.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      if (['', 'si', 's', '1', 'true', 'x'].includes(v)) d.es_socio = 'si'
+      else if (['no', 'n', '0', 'false'].includes(v)) d.es_socio = 'no'
+      else errores.push('es_socio debe ser «sí» o «no»')
+    }
     if (d.codigo_postal && !/^\d{5}$/.test(d.codigo_postal)) errores.push('codigo_postal debe tener 5 cifras')
     for (const c of ['movil_padre', 'movil_madre']) if (d[c]) {
       const v = movilValido(d[c]); if (v) d[c] = v; else errores.push(`${c} no es un teléfono válido`)
@@ -141,7 +147,7 @@ export function analizar(objetos, existentes, { hoyIso, nivelesPermitidos = null
 }
 
 // Qué columnas se escriben al sobrescribir: solo las que traen valor (una celda vacía nunca borra datos)
-export const CAMPOS_SOBRESCRIBIR = COLUMNAS.filter(c => !['fecha_alta'].includes(c))
+export const CAMPOS_SOBRESCRIBIR = COLUMNAS.filter(c => !['fecha_alta', 'es_socio'].includes(c))   // fecha_alta y es_socio solo cuentan al crear
 export function cambiosParaSobrescribir(d) {
   return Object.fromEntries(CAMPOS_SOBRESCRIBIR.filter(c => d[c]).map(c => [c, d[c]]))
 }

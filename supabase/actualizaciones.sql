@@ -9,6 +9,10 @@ alter table familias add column if not exists codigo_postal text;
 alter table familias add column if not exists localidad text;
 alter table familias add column if not exists provincia text;
 
+-- 00) «Chavales»: personas que participan sin ser socios (no_socio = true, sin periodo de alta); la app «Socios» pasa a llamarse «Chavales»
+alter table socios add column if not exists no_socio boolean not null default false;
+update apps set nombre = 'Chavales', descripcion = 'Base de datos de chavales: socios y no socios, altas y bajas' where clave = 'socios';
+
 -- 1) La app «Actividades» pasa a llamarse «Planes»
 update apps set nombre = 'Planes', descripcion = 'Calendario de planes de la asociación' where clave = 'actividades';
 
@@ -153,7 +157,7 @@ create or replace function socios_campos()
 returns table(id uuid, nombre text, apellidos text, nivel text, activo boolean)
 language sql stable security definer set search_path = public as $$
   select s.id, s.nombre, s.apellidos, s.nivel,
-         exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+         (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null))
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo(s.asociacion_id)
@@ -218,7 +222,7 @@ language sql stable security definer set search_path = public as $$
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())
     and es_equipo_app(s.asociacion_id, 'herramientas')
-    and exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)
+    and (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null))
   order by s.apellidos, s.nombre $$;
 
 -- ---------- Dirección con código postal, localidad y provincia ----------
@@ -453,7 +457,7 @@ create or replace function socios_dineros()
 returns table(id uuid, nombre text, apellidos text, nivel text, activo boolean, saldo numeric)
 language sql stable security definer set search_path = public as $$
   select s.id, s.nombre, s.apellidos, s.nivel,
-         exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null),
+         (s.no_socio or exists (select 1 from periodos_alta p where p.socio_id = s.id and p.fecha_baja is null)),
          saldo_hucha(s.id)
   from socios s
   where s.asociacion_id = (select asociacion_id from membresias where user_id = auth.uid())

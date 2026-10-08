@@ -201,7 +201,7 @@ export function crearClienteDemo() {
     const f = { ...p }
     if (PK[tabla].includes('id') && !f.id) f.id = uuid()
     const hoyIso = new Date().toISOString().slice(0, 10)
-    if (tabla === 'socios') f.creado_en ??= hoyIso
+    if (tabla === 'socios') { f.creado_en ??= hoyIso; f.no_socio ??= false }
     if (tabla === 'asociaciones') f.creada_en ??= hoyIso
     if (tabla === 'tipos_actividad') { f.activa ??= true; f.orden ??= 0 }
     if (tabla === 'permisos_preceptor') { f.puede_ver ??= false; f.puede_editar ??= false; f.ambito ??= 'su_nivel' }
@@ -382,11 +382,11 @@ export function crearClienteDemo() {
       if (nombre === 'socios_campos') {
         if (!u || !esEquipo(u, u.asoc)) return { data: [], error: null }
         return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
-          activo: db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja) })).sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
+          activo: !!x.no_socio || db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja) })).sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
       }
       if (nombre === 'direcciones_postales') {
         if (!u || !(u.rol === 'encargado' || u.rol === 'preceptor') || !appActiva(u, 'herramientas')) return { data: [], error: null }
-        return { data: db.socios.filter(x => x.asociacion_id === u.asoc && db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja))
+        return { data: db.socios.filter(x => x.asociacion_id === u.asoc && (x.no_socio || db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja)))
           .map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel, direccion: x.direccion ?? null, codigo_postal: x.codigo_postal ?? null, localidad: x.localidad ?? null, provincia: x.provincia ?? null,
             correo_padre: x.correo_padre ?? null, correo_madre: x.correo_madre ?? null }))
           .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
@@ -397,7 +397,7 @@ export function crearClienteDemo() {
       if (nombre === 'socios_dineros') {
         if (!u || !esEquipoApp(u, u.asoc, 'dineros')) return { data: [], error: null }
         return { data: db.socios.filter(x => x.asociacion_id === u.asoc).map(x => ({ id: x.id, nombre: x.nombre, apellidos: x.apellidos, nivel: x.nivel,
-          activo: db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja), saldo: saldoHucha(x.id) }))
+          activo: !!x.no_socio || db.periodos_alta.some(p => p.socio_id === x.id && !p.fecha_baja), saldo: saldoHucha(x.id) }))
           .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`, 'es')), error: null }
       }
       if (nombre === 'hucha_historial') {

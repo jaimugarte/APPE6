@@ -21,7 +21,7 @@ function SubBarra({ izq, der, valor, onCambio }) {
 }
 
 // Inicio del equipo (encargado y preceptores): barra de pestañas fija abajo, como en WhatsApp
-//   E6 (Asistencia | Estadísticas) · Socios (con lupa y menú ⋮: Nuevo, Importar, Solicitudes) · Actividades · Varios (Dineros, Herramientas…)
+//   E6 (Asistencia | Estadísticas) · Chavales (con lupa y menú ⋮: Nuevo chaval, Importar, Solicitudes) · Actividades · Varios (Dineros, Herramientas…)
 export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, pendientes, onCambio }) {
   const tiene = k => activas.some(a => a.app_clave === k)
   const asoc = mem.asociacion_id, rol = mem.rol
@@ -29,7 +29,7 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
 
   const pestanas = [
     (tiene('asistencia') || tiene('estadisticas')) && { id: 'e6', nombre: 'E6', icono: 'asistencia' },
-    (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'Socios', icono: 'socios', insignia: pendientes },
+    (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'Chavales', icono: 'socios', insignia: pendientes },
     tiene('actividades') && { id: 'act', nombre: 'Actividades', icono: 'actividades' },
     variosApps.length > 0 && { id: 'varios', nombre: 'Varios', icono: 'varios' }
   ].filter(Boolean)

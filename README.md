@@ -139,4 +139,12 @@ Saldo de cada socio por meriendas, cenas, planes, convivencias y cursos de retir
 
 ## Navegación del equipo
 
-Encargado y preceptores no ven ya una pantalla de bloques, sino una **barra inferior fija** (como WhatsApp) con: **E6** (Asistencia y Estadísticas, con una barra fina arriba: Asistencia a la izquierda, Estadísticas a la derecha), **Socios** (barra fija con título, lupa para buscar y menú de tres puntos con Nuevo socio, Importar CSV y Solicitudes; el menú lleva un punto rojo si hay solicitudes pendientes), **Actividades** y **Varios** (Dineros, Herramientas y futuras apps como bloques). Cada pestaña aparece solo si el usuario tiene acceso a alguna de sus apps; si en una solo hay una opción, no se muestra la barra fina. Ajustes (encargado), Admin y Salir siguen en la cabecera. Las familias mantienen su inicio con tarjetas.
+Encargado y preceptores no ven ya una pantalla de bloques, sino una **barra inferior fija** (como WhatsApp) con: **E6** (Asistencia y Estadísticas, con una barra fina arriba: Asistencia a la izquierda, Estadísticas a la derecha), **Chavales** (barra fija con título, lupa para buscar y menú de tres puntos con Nuevo chaval, Importar CSV y Solicitudes; el menú lleva un punto rojo si hay solicitudes pendientes), **Actividades** y **Varios** (Dineros, Herramientas y futuras apps como bloques). Cada pestaña aparece solo si el usuario tiene acceso a alguna de sus apps; si en una solo hay una opción, no se muestra la barra fina. Ajustes (encargado), Admin y Salir siguen en la cabecera. Las familias mantienen su inicio con tarjetas.
+
+## Chavales: socios y no socios
+
+La app «Socios» se llama ahora **Chavales**. Un chaval es **Socio** (tiene un periodo de alta abierto), **No socio** (participa en las actividades sin ser socio: columna `socios.no_socio`, sin periodo de alta) o **Baja**. Al crear un chaval hay un interruptor **Es socio** (activado por defecto; si se desactiva no pide fecha de alta). En la ficha de un no socio se puede **Hacer socio** o **Dejar de participar**, y a un socio de baja se le puede marcar **Participa sin ser socio**. La importación CSV admite una columna opcional `es_socio` (sí/no; vacío = sí).
+
+- Los no socios aparecen en Asistencia, en Dineros (merienda y saldos), en Trabajos y en las postales, y cuentan en las estadísticas de asistencia, pero **no** en «Socios activos» ni en las cuotas.
+- El preceptor puede crear chavales si el encargado le ha dado permiso de edición sobre Chavales (con «Solo su nivel», solo de sus niveles).
+- Proyectos ya creados: ejecuta de nuevo `supabase/actualizaciones.sql` (añade `no_socio` y renombra la app).

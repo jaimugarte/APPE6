@@ -43,7 +43,7 @@ function PantallaAsistencia({ asoc, rol, email }) {
       const [t, s] = await Promise.all([
         supabase.from('tipos_actividad').select('*').eq('asociacion_id', asoc).eq('activa', true)
           .order('orden').order('nombre'),
-        supabase.from('socios').select('id, nombre, apellidos, nivel, periodos_alta(fecha_alta, fecha_baja)')
+        supabase.from('socios').select('id, nombre, apellidos, nivel, no_socio, periodos_alta(fecha_alta, fecha_baja)')
           .eq('asociacion_id', asoc).order('apellidos').order('nombre')
       ])
       setMsg(t.error?.message || s.error?.message || '')
@@ -74,11 +74,11 @@ function PantallaAsistencia({ asoc, rol, email }) {
     return () => { vigente = false }
   }, [tipoId, inicio])
 
-  // Socios que estaban de alta en algún momento del periodo (o que ya tienen asistencia marcada)
+  // Chavales que estaban de alta en algún momento del periodo, los que participan sin ser socios y los que ya tienen asistencia marcada
   const delPeriodo = useMemo(() => {
     if (!socios || !inicio) return []
     return socios.filter(s =>
-      marcas[s.id] ||
+      marcas[s.id] || s.no_socio ||
       (s.periodos_alta || []).some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= inicio)))
   }, [socios, inicio, fin, marcas])
 

@@ -47,7 +47,7 @@ export default function Estadisticas({ asoc, rol }) {
           .order('orden').order('nombre')
         if (e1) throw e1
         const socios = await paginar(() => supabase.from('socios')
-          .select('id, nivel, fecha_nacimiento, periodos_alta(fecha_alta, fecha_baja)')
+          .select('id, nivel, fecha_nacimiento, no_socio, periodos_alta(fecha_alta, fecha_baja)')
           .eq('asociacion_id', asoc).order('id'))
         const desde = calc.desdeNecesario(tipos, H, 24)
         const registros = await paginar(() => supabase.from('registros_asistencia')

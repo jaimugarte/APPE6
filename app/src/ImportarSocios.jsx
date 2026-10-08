@@ -12,7 +12,7 @@ function descargarPlantilla() {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-// Importar socios desde un CSV con la plantilla de la app: comprueba columnas y campos, avisa de duplicados
+// Importar chavales desde un CSV con la plantilla de la app: comprueba columnas y campos, avisa de duplicados
 // (mismo nombre de hijo + correo de un progenitor) y deja elegir entre sobrescribir u omitir.
 export default function ImportarSocios({ asoc, esEncargado, existentes, nivelesPermitidos, onVolver, onCambio }) {
   const [paso, setPaso] = useState('inicio') // inicio | revision | resultado
@@ -63,11 +63,14 @@ export default function ImportarSocios({ asoc, esEncargado, existentes, nivelesP
       const d = it.datos
       let socioId
       if (it.estado === 'nuevo') {
-        const { data, error } = await supabase.from('socios').insert({ ...datosParaCrear(d), asociacion_id: asoc }).select('id').single()
+        const noSocio = d.es_socio === 'no'
+        const { data, error } = await supabase.from('socios').insert({ ...datosParaCrear(d), asociacion_id: asoc, no_socio: noSocio }).select('id').single()
         if (error) { r.fallos.push(`Fila ${it.fila}: ${error.message}`); continue }
         socioId = data.id
-        const { error: e2 } = await supabase.from('periodos_alta').insert({ socio_id: socioId, fecha_alta: d.fecha_alta || hoy() })
-        if (e2) { r.fallos.push(`Fila ${it.fila}: se creó el socio pero falló el alta (${e2.message})`); continue }
+        if (!noSocio) {
+          const { error: e2 } = await supabase.from('periodos_alta').insert({ socio_id: socioId, fecha_alta: d.fecha_alta || hoy() })
+          if (e2) { r.fallos.push(`Fila ${it.fila}: se creó el chaval pero falló el alta (${e2.message})`); continue }
+        }
         r.creados++
       } else {
         const cambios = cambiosParaSobrescribir(d)
@@ -196,7 +199,7 @@ export default function ImportarSocios({ asoc, esEncargado, existentes, nivelesP
   return (
     <main className="importar">
       <div className="barra">
-        <h2>Importar socios desde CSV</h2>
+        <h2>Importar chavales desde CSV</h2>
         <button onClick={onVolver}>← Volver</button>
       </div>
       <section>
@@ -209,7 +212,7 @@ export default function ImportarSocios({ asoc, esEncargado, existentes, nivelesP
             <tbody>{COLUMNAS.map(c => <tr key={c}><td><code>{c}</code></td><td>{AYUDA[c]}</td></tr>)}</tbody>
           </table>
         </div>
-        {nivelesPermitidos && <p className="aviso">Solo puedes importar socios de tus niveles: {nivelesPermitidos.join(', ') || 'ninguno asignado'}.</p>}
+        {nivelesPermitidos && <p className="aviso">Solo puedes importar chavales de tus niveles: {nivelesPermitidos.join(', ') || 'ninguno asignado'}.</p>}
       </section>
       <section>
         <h2>2. Sube el archivo</h2>

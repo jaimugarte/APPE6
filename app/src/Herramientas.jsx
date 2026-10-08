@@ -67,7 +67,7 @@ function Postales({ onVolver }) {
             <button className="fn" onClick={() => { setUrl(''); setNiveles([]) }}>Ninguno</button>
             {todos.map(n => <button key={n} className={'fn' + (niveles.includes(n) ? ' on' : '')} aria-pressed={niveles.includes(n)} onClick={() => alternar(n)}>{n}</button>)}
           </div>
-          {!todos.length && <p className="aviso">No hay socios de alta.</p>}
+          {!todos.length && <p className="aviso">No hay chavales de alta.</p>}
         </section>
 
         {niveles.length > 0 && <section>

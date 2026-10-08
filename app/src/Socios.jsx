@@ -12,6 +12,9 @@ const VACIO = {
 // Círculos y catequesis solo se preguntan desde 2º ESO (Universidad incluida)
 const desde2ESO = nivel => NIVELES.indexOf(nivel) >= NIVELES.indexOf('2º ESO')
 const abierto = s => s.periodos_alta?.find(p => !p.fecha_baja)
+// Socio = periodo de alta abierto · No socio = participa sin ser socio · Baja = ya no participa
+const estadoDe = s => abierto(s) ? 'socio' : s.no_socio ? 'nosocio' : 'baja'
+const ETIQUETA = { socio: ['Socio', 'badge ok'], nosocio: ['No socio', 'badge pend'], baja: ['Baja', 'badge baja'] }
 
 export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes = null }) {
   const [socios, setSocios] = useState(null)
@@ -52,8 +55,11 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase()
     return (socios || []).filter(s => {
-      if (estado === 'activos' && !abierto(s)) return false
-      if (estado === 'bajas' && abierto(s)) return false
+      const e = estadoDe(s)
+      if (estado === 'activos' && e === 'baja') return false
+      if (estado === 'socios' && e !== 'socio') return false
+      if (estado === 'nosocios' && e !== 'nosocio') return false
+      if (estado === 'bajas' && e !== 'baja') return false
       if (nivel && s.nivel !== nivel) return false
       return !t || `${s.nombre} ${s.apellidos}`.toLowerCase().includes(t)
     })
@@ -63,7 +69,7 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
     () => [...new Set((socios || []).map(s => s.nivel).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')),
     [socios])
 
-  if (socios === null) return <main><p>Cargando socios…</p></main>
+  if (socios === null) return <main><p>Cargando chavales…</p></main>
 
   if (sel === 'importar') {
     return <ImportarSocios asoc={asoc} esEncargado={esEncargado} existentes={socios}
@@ -80,7 +86,7 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
     )
   }
 
-  const activos = (socios || []).filter(abierto).length
+  const activos = (socios || []).filter(s => estadoDe(s) !== 'baja').length
 
   return (
     <>
@@ -91,9 +97,9 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
             <input type="search" autoFocus placeholder="Buscar por nombre o apellidos" value={q} onChange={e => setQ(e.target.value)} />
           </>
           : <>
-            <h2>Socios <small>({activos} activos)</small></h2>
+            <h2>Chavales <small>({activos} activos)</small></h2>
             <span className="acciones-barra">
-              <button className="icono-btn" aria-label="Buscar socio" onClick={() => { setMenu(false); setBuscando(true) }}>
+              <button className="icono-btn" aria-label="Buscar chaval" onClick={() => { setMenu(false); setBuscando(true) }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
               </button>
               <button className="icono-btn" aria-label={pendientes > 0 ? `Más opciones (${pendientes} solicitudes pendientes)` : 'Más opciones'} aria-expanded={menu} onClick={() => setMenu(m => !m)}>
@@ -105,7 +111,7 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
         {menu && <>
         <div className="menu-velo" onClick={() => setMenu(false)} />
         <ul className="menu-barra" role="menu">
-          {puedeEditar && <li><button role="menuitem" onClick={() => { setMenu(false); setSel('nuevo') }}>Nuevo socio</button></li>}
+          {puedeEditar && <li><button role="menuitem" onClick={() => { setMenu(false); setSel('nuevo') }}>Nuevo chaval</button></li>}
           {puedeEditar && <li><button role="menuitem" onClick={() => { setMenu(false); setSel('importar') }}>Importar CSV</button></li>}
           {onSolicitudes && <li><button role="menuitem" onClick={() => { setMenu(false); onSolicitudes() }}>Solicitudes{pendientes > 0 && <span className="contador">{pendientes}</span>}</button></li>}
           {!puedeEditar && !onSolicitudes && <li><span className="vacio-menu">Sin más opciones</span></li>}
@@ -121,13 +127,15 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
           {niveles.map(n => <option key={n}>{n}</option>)}
         </select>
         <select value={estado} onChange={e => setEstado(e.target.value)}>
-          <option value="activos">Activos</option>
+          <option value="activos">Activos (socios y no socios)</option>
+          <option value="socios">Solo socios</option>
+          <option value="nosocios">Solo no socios</option>
           <option value="bajas">De baja</option>
           <option value="todos">Todos</option>
         </select>
       </div>
 
-      {lista.length === 0 && <p className="aviso">No hay socios que coincidan.</p>}
+      {lista.length === 0 && <p className="aviso">No hay chavales que coincidan.</p>}
       {lista.map(s => {
         const a = edad(s.fecha_nacimiento)
         return (
@@ -139,7 +147,7 @@ export default function Socios({ asoc, rol, email, pendientes = 0, onSolicitudes
                 {a != null && <span>{a} años</span>}
               </small>
             </span>
-            <span className={abierto(s) ? 'badge ok' : 'badge baja'}>{abierto(s) ? 'Alta' : 'Baja'}</span>
+            <span className={ETIQUETA[estadoDe(s)][1]}>{ETIQUETA[estadoDe(s)][0]}</span>
           </button>
         )
       })}
@@ -158,6 +166,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
     ? Object.fromEntries(Object.keys(VACIO).map(k => [k, socio[k] ?? '']))
     : { ...VACIO, nivel: restringido ? (nivelesOpc[0] || '') : '' })
   const [altaInicial, setAltaInicial] = useState(hoy())
+  const [esSocio, setEsSocio] = useState(true)   // al crear: ¿es socio? (si no, participa sin ser socio)
   const [iban, setIban] = useState('')
   const [eq, setEq] = useState({ asiste_circulos: false, es_catequista: false }) // por defecto «No»
   const [msg, setMsg] = useState('')
@@ -182,7 +191,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
   const guardar = async () => {
     setMsg(''); setOk('')
     if (!f.nombre.trim() || !f.apellidos.trim()) return setMsg('Nombre y apellidos son obligatorios.')
-    for (const [k, t] of [['correo_padre', 'del padre'], ['correo_madre', 'de la madre'], ['correo_socio', 'del socio']])
+    for (const [k, t] of [['correo_padre', 'del padre'], ['correo_madre', 'de la madre'], ['correo_socio', 'del chaval']])
       if (!esEmail(f[k].trim())) return setMsg(`El correo ${t} no es válido.`)
     if (!esCodigoPostal(f.codigo_postal)) return setMsg('El código postal debe tener 5 cifras.')
     if (esEncargado && iban.trim() && !ibanValido(iban)) return setMsg('El IBAN no es válido.')
@@ -192,15 +201,17 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
     let id = socio?.id
     if (nuevo) {
       const { data, error } = await supabase.from('socios')
-        .insert({ ...datos, asociacion_id: asoc }).select('id').single()
+        .insert({ ...datos, asociacion_id: asoc, no_socio: !esSocio }).select('id').single()
       if (error) { setGuardando(false); return setMsg(error.message) }
       id = data.id
-      const { error: e2 } = await supabase.from('periodos_alta').insert({ socio_id: id, fecha_alta: altaInicial })
-      if (e2) { setGuardando(false); await onCambio(); return setMsg('El socio se creó, pero falló el alta: ' + e2.message) }
+      if (esSocio) {
+        const { error: e2 } = await supabase.from('periodos_alta').insert({ socio_id: id, fecha_alta: altaInicial })
+        if (e2) { setGuardando(false); await onCambio(); return setMsg('El chaval se creó, pero falló el alta: ' + e2.message) }
+      }
     } else {
       const { data, error } = await supabase.from('socios').update(datos).eq('id', id).select('id')
       if (error) { setGuardando(false); return setMsg(error.message) }
-      if (!data?.length) { setGuardando(false); return setMsg('No tienes permiso para editar este socio.') }
+      if (!data?.length) { setGuardando(false); return setMsg('No tienes permiso para editar a este chaval.') }
     }
     if (desde2ESO(datos.nivel)) {
       const { error } = await supabase.from('socios_equipo').upsert({ socio_id: id, ...eq })
@@ -222,11 +233,12 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
     <main>
       <div className="barra">
         <button onClick={onVolver}>← Volver</button>
-        <h2>{nuevo ? 'Nuevo socio' : `${socio.nombre} ${socio.apellidos}`}</h2>
+        <h2>{nuevo ? 'Nuevo chaval' : `${socio.nombre} ${socio.apellidos}`}</h2>
+        {!nuevo && <span className={ETIQUETA[estadoDe(socio)][1]}>{ETIQUETA[estadoDe(socio)][0]}</span>}
       </div>
 
       <section>
-        <h2>Datos del socio</h2>
+        <h2>Datos del chaval</h2>
         <div className="formgrid">
           <Campo label="Nombre *"><input value={f.nombre} onChange={set('nombre')} disabled={ro} /></Campo>
           <Campo label="Apellidos *"><input value={f.apellidos} onChange={set('apellidos')} disabled={ro} /></Campo>
@@ -247,6 +259,12 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
             )}
           </Campo>
           {nuevo && (
+            <label className="check-fila ancho">
+              <input type="checkbox" checked={esSocio} onChange={e => setEsSocio(e.target.checked)} />
+              <span><b>Es socio</b><br /><small>{esSocio ? 'Cuenta como socio (cuotas y estadísticas de socios).' : 'Participa en las actividades sin ser socio.'}</small></span>
+            </label>
+          )}
+          {nuevo && esSocio && (
             <Campo label="Fecha de alta">
               <input type="date" value={altaInicial} onChange={e => setAltaInicial(e.target.value)} />
             </Campo>
@@ -278,7 +296,7 @@ function Ficha({ socio, asoc, esEncargado, puedeEditar, restringido, nivelesOpc,
           <Campo label="Nombre de la madre"><input value={f.nombre_madre} onChange={set('nombre_madre')} disabled={ro} /></Campo>
           <Campo label="Móvil de la madre"><input type="tel" value={f.movil_madre} onChange={set('movil_madre')} disabled={ro} /></Campo>
           <Campo label="Correo de la madre"><input type="email" value={f.correo_madre} onChange={set('correo_madre')} disabled={ro} /></Campo>
-          <Campo label="Correo del socio"><input type="email" value={f.correo_socio} onChange={set('correo_socio')} disabled={ro} /></Campo>
+          <Campo label="Correo del chaval"><input type="email" value={f.correo_socio} onChange={set('correo_socio')} disabled={ro} /></Campo>
           <Campo label="Dirección de casa (calle, número, piso)" ancho><input value={f.direccion} onChange={set('direccion')} disabled={ro} /></Campo>
           <Campo label="Código postal"><input inputMode="numeric" maxLength={5} value={f.codigo_postal} onChange={set('codigo_postal')} disabled={ro} /></Campo>
           <Campo label="Localidad"><input value={f.localidad} onChange={set('localidad')} disabled={ro} /></Campo>
@@ -331,12 +349,20 @@ function Periodos({ socio, puedeEditar, onCambio }) {
     if (ultimaBaja && fechaMov < ultimaBaja) return setMsg(`El alta no puede ser anterior a la última baja (${fecha(ultimaBaja)}).`)
     const { error } = await supabase.from('periodos_alta').insert({ socio_id: socio.id, fecha_alta: fechaMov })
     if (error) return setMsg(error.message)
+    if (socio.no_socio) await supabase.from('socios').update({ no_socio: false }).eq('id', socio.id)   // si era no socio, ya es socio
+    onCambio()
+  }
+  // Participar sin ser socio (o dejar de participar)
+  const ponerNoSocio = async valor => {
+    setMsg('')
+    const { data, error } = await supabase.from('socios').update({ no_socio: valor }).eq('id', socio.id).select('id')
+    if (error || !data?.length) return setMsg(error?.message || 'No tienes permiso para esta operación.')
     onCambio()
   }
 
   return (
     <section>
-      <h2>Altas y bajas <small>({ab ? 'actualmente de alta' : 'actualmente de baja'})</small></h2>
+      <h2>Socio: altas y bajas <small>({ab ? 'socio ahora' : socio.no_socio ? 'participa sin ser socio' : 'de baja'})</small></h2>
       {ps.length === 0 && <p className="aviso">Sin historial todavía.</p>}
       <ul className="historial">
         {ps.map(p => (
@@ -355,7 +381,12 @@ function Periodos({ socio, puedeEditar, onCambio }) {
               <button className="peligro" onClick={darBaja}>Dar de baja</button>
             </>
           ) : (
-            <button className="primario" onClick={darAlta}>Volver a dar de alta</button>
+            <>
+              <button className="primario" onClick={darAlta}>{ps.length || socio.no_socio ? 'Hacer socio' : 'Dar de alta como socio'}</button>
+              {socio.no_socio
+                ? <button className="peligro" onClick={() => ponerNoSocio(false)}>Dejar de participar</button>
+                : <button onClick={() => ponerNoSocio(true)}>Participa sin ser socio</button>}
+            </>
           )}
         </div>
       )}
@@ -364,7 +395,7 @@ function Periodos({ socio, puedeEditar, onCambio }) {
   )
 }
 
-// Cuentas de Google de las familias que pueden ver a este socio
+// Cuentas de Google de las familias que pueden ver a este chaval
 function Familia({ socio, esEncargado, onVinculo }) {
   const [lista, setLista] = useState([])
   const [email, setEmail] = useState('')

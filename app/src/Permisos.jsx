@@ -54,7 +54,7 @@ export default function Permisos({ asoc, apps }) {
       {msg && <p className="error">{msg}</p>}
       <section>
         <h2>Permisos de los preceptores</h2>
-        <p className="aviso">Se aplican a todos los preceptores de la asociación. Con «Solo su nivel», cada preceptor solo accede a los socios de los niveles que tenga asignados.</p>
+        <p className="aviso">Se aplican a todos los preceptores de la asociación. Con «Solo su nivel», cada preceptor solo accede a los chavales de los niveles que tenga asignados.</p>
         {activas.length === 0 && <p className="aviso">Activa alguna app para configurar sus permisos.</p>}
         {activas.map(a => {
           const p = perms.find(x => x.app_clave === a.app_clave) || POR_DEFECTO

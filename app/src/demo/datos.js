@@ -64,7 +64,7 @@ export function crearBD() {
       { id: ASOC2, nombre: 'Otra Asociación (vacía)', foto_ruta: null, creada_en: H }
     ],
     apps: [
-      { clave: 'socios', nombre: 'Socios', descripcion: 'Base de datos de socios, altas y bajas' },
+      { clave: 'socios', nombre: 'Chavales', descripcion: 'Base de datos de chavales: socios y no socios, altas y bajas' },
       { clave: 'asistencia', nombre: 'Asistencia', descripcion: 'Registro de asistencia a eventos' },
       { clave: 'estadisticas', nombre: 'Estadísticas', descripcion: 'Gráficos y paneles' },
       { clave: 'actividades', nombre: 'Actividades', descripcion: 'Calendario de actividades de la asociación' },

@@ -10,7 +10,7 @@ const p2 = n => String(n).padStart(2, '0')
 export const estabaActivo = (s, f) =>
   (s.periodos_alta || []).some(p => p.fecha_alta <= f && (!p.fecha_baja || p.fecha_baja >= f))
 
-const elegible = (s, ini, fin) =>
+const elegible = (s, ini, fin) => !!s.no_socio ||   // los no socios que participan cuentan en la asistencia (no en «socios activos»)
   (s.periodos_alta || []).some(p => p.fecha_alta <= fin && (!p.fecha_baja || p.fecha_baja >= ini))
 
 const ultimoDia = ym => {
