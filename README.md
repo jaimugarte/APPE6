@@ -139,7 +139,7 @@ Saldo de cada socio por meriendas, cenas, planes, convivencias y cursos de retir
 
 ## Navegación del equipo
 
-Encargado y preceptores no ven ya una pantalla de bloques, sino una **barra inferior fija** (como WhatsApp) con: **E6** (Asistencia y Estadísticas, con una barra fina arriba: Asistencia a la izquierda, Estadísticas a la derecha), **Chavales** (barra fija con título, lupa para buscar y menú de tres puntos con Nuevo chaval, Importar CSV y Solicitudes; el menú lleva un punto rojo si hay solicitudes pendientes), **Actividades** y **Varios** (Dineros, Herramientas y futuras apps como bloques). Cada pestaña aparece solo si el usuario tiene acceso a alguna de sus apps; si en una solo hay una opción, no se muestra la barra fina. Ajustes (encargado), Admin y Salir siguen en la cabecera. Las familias mantienen su inicio con tarjetas.
+Encargado y preceptores no ven ya una pantalla de bloques, sino una **barra inferior fija** (como WhatsApp) con: **Calendario** (las actividades; es la pestaña por defecto), **E6** (Asistencia y Estadísticas, con una barra fina arriba: Asistencia a la izquierda, Estadísticas a la derecha), **Chavales** (barra fija con título, lupa para buscar y menú de tres puntos con Nuevo chaval, Importar CSV y Solicitudes; el menú lleva un punto rojo si hay solicitudes pendientes) y **Varios** (Dineros, Herramientas y futuras apps como bloques). Cada pestaña aparece solo si el usuario tiene acceso a alguna de sus apps; si en una solo hay una opción, no se muestra la barra fina. Ajustes (encargado), Admin y Salir siguen en la cabecera. Las familias mantienen su inicio con tarjetas.
 
 ## Chavales: socios y no socios
 
