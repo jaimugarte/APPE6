@@ -651,3 +651,40 @@ create policy an_upd on anuncios for update
   using (puede_plan(asociacion_id, niveles, 'editar')) with check (puede_plan(asociacion_id, niveles, 'editar'));
 drop policy if exists an_del on anuncios;
 create policy an_del on anuncios for delete using (puede_plan(asociacion_id, niveles, 'editar'));
+
+-- ---------- TABLÓN: IMÁGENES (CARTELES) EN LOS ANUNCIOS ----------
+-- Se guardan en el bucket privado asociacion-fotos, en <id de la asociación>/anuncios/<archivo>.
+-- Suben y borran quienes pueden publicar (encargado; preceptores con permiso de edición en Actividades); ven los miembros de la asociación.
+alter table anuncios add column if not exists imagen_ruta text check (imagen_ruta is null or length(imagen_ruta) <= 200);
+
+create or replace function puede_publicar(p_asoc uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from membresias m
+    where m.user_id = auth.uid() and m.asociacion_id = p_asoc
+      and (m.rol = 'encargado'
+           or (m.rol = 'preceptor' and exists (select 1 from permisos_preceptor pp
+               where pp.asociacion_id = p_asoc and pp.app_clave = 'actividades' and pp.puede_editar))))
+    and exists (select 1 from asociacion_apps a where a.asociacion_id = p_asoc and a.app_clave = 'actividades' and a.activa) $$;
+
+create or replace function puede_publicar_carpeta(p_nombre text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select split_part(p_nombre, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     and split_part(p_nombre, '/', 2) = 'anuncios'
+     and coalesce(puede_publicar(split_part(p_nombre, '/', 1)::uuid), false) $$;
+
+drop policy if exists af_subir_anuncios on storage.objects;
+create policy af_subir_anuncios on storage.objects for insert to authenticated
+  with check (bucket_id = 'asociacion-fotos' and puede_publicar_carpeta(name));
+drop policy if exists af_borrar_anuncios on storage.objects;
+create policy af_borrar_anuncios on storage.objects for delete to authenticated
+  using (bucket_id = 'asociacion-fotos' and puede_publicar_carpeta(name));
+
+-- La imagen de un anuncio tiene que estar en la carpeta de su asociación
+drop policy if exists an_ins on anuncios;
+create policy an_ins on anuncios for insert
+  with check (puede_plan(asociacion_id, niveles, 'editar') and (imagen_ruta is null or split_part(imagen_ruta, '/', 1) = asociacion_id::text));
+drop policy if exists an_upd on anuncios;
+create policy an_upd on anuncios for update
+  using (puede_plan(asociacion_id, niveles, 'editar'))
+  with check (puede_plan(asociacion_id, niveles, 'editar') and (imagen_ruta is null or split_part(imagen_ruta, '/', 1) = asociacion_id::text));

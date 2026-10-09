@@ -614,3 +614,14 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .tablon-modo { display: grid; gap: 2px; margin-left: 26px; }
 input.dias { display: inline-block; width: 3.2ch; min-height: 0; padding: 2px 6px; text-align: center; }
 .check input.dias { width: 4ch; max-width: 4ch; display: inline-block; vertical-align: baseline; }
+
+/* Carteles de los anuncios */
+.cartel { display: block; width: 100%; min-height: 0; margin: 8px 0 0; padding: 0; border: 0; border-radius: 10px; background: #eef1f8; overflow: hidden; }
+.cartel img { display: block; width: 100%; max-height: 420px; object-fit: cover; }
+.cartel-carga { height: 140px; }
+.cartel-grande { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 12px; background: rgba(10, 16, 30, .88); }
+.cartel-grande img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+.cartel-grande button { position: absolute; top: 12px; right: 14px; width: 40px; min-height: 0; height: 40px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .9); font-size: 1.5rem; }
+.cartel-previa { display: block; width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px; margin: 6px 0; }
+.boton-archivo { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--linea); border-radius: var(--r-md, 10px); background: var(--superficie); cursor: pointer; font-weight: 600; }
+.boton-archivo input { display: none; }

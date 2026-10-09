@@ -93,6 +93,9 @@ export function crearClienteDemo() {
   const esEquipo = (u, asoc) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, 'dineros')
   const campoDe = id => db.campos_trabajo.find(c => c.id === id)
   const esEquipoApp = (u, asoc, app) => !!u && u.asoc === asoc && (u.rol === 'encargado' || u.rol === 'preceptor') && appActiva(u, app)
+  // Quienes pueden publicar anuncios (y subir sus imágenes): encargado y preceptores con permiso de edición en Actividades
+  const puedePublicar = u => !!u && appActiva(u, 'actividades') && (u.rol === 'encargado' || (u.rol === 'preceptor' && !!permiso(u, 'actividades')?.puede_editar))
+  const rutaAnuncio = (u, ruta) => { const [a, carpeta] = String(ruta).split('/'); return a === u?.asoc && carpeta === 'anuncios' && puedePublicar(u) }
   const saldoHucha = id => Math.round((db.hucha_movimientos.filter(x => x.socio_id === id).reduce((a, x) => a + Number(x.importe), 0) + saldoCampo(id)) * 100) / 100
   const puedeVerHucha = (u, s) => !!u && !!s && s.asociacion_id === u.asoc && appActiva(u, 'dineros') && (esEquipoApp(u, s.asociacion_id, 'dineros') || (u.rol === 'familia' && esFamiliar(u, s.id)))
   const saldoCampo = socioId =>
@@ -205,7 +208,7 @@ export function crearClienteDemo() {
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
-      case 'anuncios': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
+      case 'anuncios': return puedePlan(u, r.asociacion_id, r.niveles, 'editar') && (!r.imagen_ruta || String(r.imagen_ruta).split('/')[0] === r.asociacion_id)
       case 'furgonetas': return u.rol === 'encargado' && r.asociacion_id === u.asoc && appActiva(u, 'furgonetas')
       case 'plan_furgonetas': return appActiva(u, 'furgonetas') && puedePlanEquipo(u, planDe(r.plan_id), 'editar')
       case 'plan_inscritos': return puedePlanEquipo(u, planDe(r.plan_id), 'editar') && socioDe(r.socio_id)?.asociacion_id === planDe(r.plan_id)?.asociacion_id
@@ -235,7 +238,7 @@ export function crearClienteDemo() {
     if (tabla === 'campos_trabajo') { f.descripcion ??= null; f.responsable_email ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'campo_participantes') f.importe ??= 0
     if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.limite ??= null; f.notificar ??= true; f.en_tablon ??= true; f.tablon_dias_antes ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
-    if (tabla === 'anuncios') { f.texto ??= ''; f.niveles ??= []; f.caduca ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= new Date().toISOString() }
+    if (tabla === 'anuncios') { f.texto ??= ''; f.niveles ??= []; f.caduca ??= null; f.imagen_ruta ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= new Date().toISOString() }
     if (tabla === 'furgonetas') { f.matricula ??= null; f.activa ??= true; f.creada_en ??= hoyIso }
     if (tabla === 'plan_inscritos') { f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
@@ -404,7 +407,7 @@ export function crearClienteDemo() {
       from: bucket => ({
         upload: async (ruta, blob) => {
           const u = ctx()
-          if (bucket !== 'asociacion-fotos' || u?.rol !== 'encargado' || ruta.split('/')[0] !== u.asoc)
+          if (bucket !== 'asociacion-fotos' || !u || !(u.rol === 'encargado' && ruta.split('/')[0] === u.asoc || rutaAnuncio(u, ruta)))
             return err('42501', 'new row violates row-level security policy')
           objetos.set(ruta, blob)
           return { data: { path: ruta }, error: null }
@@ -420,7 +423,7 @@ export function crearClienteDemo() {
         remove: async rutas => {
           const u = ctx()
           const borrados = []
-          if (u?.rol === 'encargado') for (const r of rutas) if (r.split('/')[0] === u.asoc && objetos.delete(r)) borrados.push({ name: r })
+          for (const r of rutas) if (((u?.rol === 'encargado' && r.split('/')[0] === u.asoc) || rutaAnuncio(u, r)) && objetos.delete(r)) borrados.push({ name: r })
           return { data: borrados, error: null }
         }
       })

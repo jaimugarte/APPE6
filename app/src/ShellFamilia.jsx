@@ -7,7 +7,7 @@ import FamiliaAjustes from './FamiliaAjustes'
 import { AvisoPlanes } from './PlanesFamilia'
 import Tablon from './Tablon'
 
-// Inicio de las familias: barra inferior fija con Tablón · Calendario (por defecto) · Hijos socios · Cuotas · Ajustes
+// Inicio de las familias: barra inferior fija con Tablón (por defecto) · Calendario · Hijos socios · Cuotas · Ajustes
 export default function ShellFamilia({ activas, mem, email, onCambio }) {
   const conCalendario = activas.some(a => a.app_clave === 'actividades')
   const pestanas = [
@@ -17,7 +17,7 @@ export default function ShellFamilia({ activas, mem, email, onCambio }) {
     { id: 'cuotas', nombre: 'Cuotas', icono: 'cuotas' },
     { id: 'ajustes', nombre: 'Ajustes', icono: 'ajustes' }
   ].filter(Boolean)
-  const [tab, setTab] = useState(conCalendario ? 'act' : 'hijos')   // Calendario por defecto
+  const [tab, setTab] = useState(conCalendario ? 'tablon' : 'hijos')   // Tablón por defecto
   const [foco, setFoco] = useState(null)   // plan al que lleva un aviso: { fecha, n }
 
   return (

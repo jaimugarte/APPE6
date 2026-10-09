@@ -3,13 +3,28 @@ import { supabase } from './supabase'
 import { NIVELES, hoy, fecha } from './util'
 import { eur } from './cuotas'
 import { etiquetaTipo } from './tiposActividad'
+import { BUCKET, prepararFoto, useFotoUrl } from './foto'
 import { colorNivel, colorPlan, ordenarNiveles, COLOR_TODOS } from './coloresNivel'
 import { useApuntes, ApuntarHijos, Plazas } from './PlanesFamilia'
 import { fechaCorta } from './familiaResumen'
 import { seccionesTablon } from './tablonUtil'
 
 const hora = h => (h ? h.slice(0, 5) : '')
-const VACIO = { titulo: '', texto: '', niveles: [], caduca: '' }
+const VACIO = { titulo: '', texto: '', niveles: [], caduca: '', imagen_ruta: null }
+
+// Cartel de un anuncio; al tocarlo se amplía
+function Cartel({ ruta, alt }) {
+  const url = useFotoUrl(ruta)
+  const [grande, setGrande] = useState(false)
+  if (!ruta) return null
+  if (!url) return <div className="cartel cartel-carga" aria-hidden="true" />
+  return (
+    <>
+      <button type="button" className="cartel" aria-label={`Ampliar imagen: ${alt}`} onClick={() => setGrande(true)}><img src={url} alt={alt} loading="lazy" /></button>
+      {grande && <div className="cartel-grande" role="dialog" aria-label={alt} onClick={() => setGrande(false)}><img src={url} alt={alt} /><button type="button" aria-label="Cerrar">×</button></div>}
+    </>
+  )
+}
 
 // Tablón: anuncios del club y de cada nivel, más las actividades que se han añadido al tablón (hasta que pasan).
 // Lo ve todo el mundo según sus niveles: las familias, los de sus hijos; los preceptores, los suyos; el encargado, todo.
@@ -93,6 +108,7 @@ function Anuncio({ a, editable, onEditar }) {
   return (
     <article className="plan anuncio" style={{ '--c': c }}>
       <div className="plan-cab"><b>{a.titulo}</b><small className="meta">{fecha(String(a.creado_en).slice(0, 10))}</small></div>
+      <Cartel ruta={a.imagen_ruta} alt={a.titulo} />
       {a.texto && <p className="plan-desc anuncio-texto">{a.texto}</p>}
       <div className="chips">
         {a.niveles.length > 1 && ordenarNiveles(a.niveles).map(n => <span key={n} className="chip nv" style={{ '--c': colorNivel(n) }}>{n}</span>)}
@@ -133,7 +149,19 @@ function EditorAnuncio({ anuncio, asoc, niveles, todos, onVolver, onGuardado }) 
   const [f, setF] = useState({ ...VACIO, ...anuncio, caduca: anuncio.caduca || '' })
   const [msg, setMsg] = useState('')
   const [borrar, setBorrar] = useState(false)
+  const [archivo, setArchivo] = useState(null)       // imagen nueva elegida
+  const [quitada, setQuitada] = useState(false)      // se ha quitado la imagen que ya tenía
+  const [vista, setVista] = useState(null)
+  const [guardando, setGuardando] = useState(false)
+  const urlActual = useFotoUrl(!quitada && !archivo ? anuncio.imagen_ruta : null)
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
+  const elegir = e => {
+    const a = e.target.files?.[0]; e.target.value = ''
+    if (!a) return
+    if (!/^image\//.test(a.type)) return setMsg('El archivo tiene que ser una imagen.')
+    setMsg(''); setArchivo(a); setVista(URL.createObjectURL(a))
+  }
+  const quitarImagen = () => { setArchivo(null); setVista(null); setQuitada(true) }
   const alternar = n => set('niveles', f.niveles.includes(n) ? f.niveles.filter(x => x !== n) : [...f.niveles, n])
   const lista = [...new Set([...niveles, ...f.niveles])]
 
@@ -142,16 +170,31 @@ function EditorAnuncio({ anuncio, asoc, niveles, todos, onVolver, onGuardado }) 
     if (!f.titulo.trim()) return setMsg('Escribe un título.')
     if (!todos && f.niveles.length === 0) return setMsg('Elige al menos un nivel.')
     if (f.caduca && f.caduca < hoy()) return setMsg('La fecha de retirada ya ha pasado.')
-    const fila = { titulo: f.titulo.trim(), texto: f.texto.trim(), niveles: f.niveles, caduca: f.caduca || null }
+    setGuardando(true)
+    let imagen_ruta = quitada ? null : anuncio.imagen_ruta || null
+    if (archivo) {
+      try {
+        const blob = await prepararFoto(archivo)
+        const ruta = `${asoc}/anuncios/${crypto.randomUUID()}.jpg`
+        const { error: eSubida } = await supabase.storage.from(BUCKET).upload(ruta, blob, { contentType: 'image/jpeg' })
+        if (eSubida) { setGuardando(false); return setMsg(`No se pudo subir la imagen: ${eSubida.message}`) }
+        imagen_ruta = ruta
+      } catch (er) { setGuardando(false); return setMsg(er.message) }
+    }
+    const fila = { titulo: f.titulo.trim(), texto: f.texto.trim(), niveles: f.niveles, caduca: f.caduca || null, imagen_ruta }
     const { error } = nuevo
       ? await supabase.from('anuncios').insert({ ...fila, asociacion_id: asoc })
       : await supabase.from('anuncios').update(fila).eq('id', anuncio.id)
-    if (error) return setMsg(error.message)
+    setGuardando(false)
+    if (error) { if (archivo) supabase.storage.from(BUCKET).remove([imagen_ruta]); return setMsg(error.message) }
+    // Si se ha cambiado o quitado la imagen, se borra la anterior
+    if (anuncio.imagen_ruta && anuncio.imagen_ruta !== imagen_ruta) supabase.storage.from(BUCKET).remove([anuncio.imagen_ruta])
     onGuardado()
   }
   const eliminar = async () => {
     const { error } = await supabase.from('anuncios').delete().eq('id', anuncio.id)
     if (error) return setMsg(error.message)
+    if (anuncio.imagen_ruta) supabase.storage.from(BUCKET).remove([anuncio.imagen_ruta])
     onGuardado()
   }
 
@@ -174,10 +217,19 @@ function EditorAnuncio({ anuncio, asoc, niveles, todos, onVolver, onGuardado }) 
           </div>
           <small className="aviso">{todos ? 'Si no eliges ninguno, el anuncio es para todo el club.' : 'Solo puedes elegir entre tus niveles.'}</small>
         </div>
+        <div className="campo ancho">
+          <span>Imagen o cartel (opcional)</span>
+          {(vista || urlActual) && <img className="cartel-previa" src={vista || urlActual} alt="Vista previa del cartel" />}
+          <div className="fila">
+            <label className="boton-archivo">{vista || urlActual ? 'Cambiar imagen' : 'Añadir imagen'}
+              <input type="file" accept="image/*" onChange={elegir} /></label>
+            {(vista || urlActual) && <button type="button" onClick={quitarImagen}>Quitar</button>}
+          </div>
+        </div>
         <label className="campo"><span>Retirar el (opcional)</span><input type="date" value={f.caduca} min={hoy()} onChange={e => set('caduca', e.target.value)} /></label>
         {msg && <p className="error ancho">{msg}</p>}
         <div className="fila ancho">
-          <button className="primario" type="submit">{nuevo ? 'Publicar' : 'Guardar'}</button>
+          <button className="primario" type="submit" disabled={guardando}>{guardando ? 'Guardando…' : nuevo ? 'Publicar' : 'Guardar'}</button>
           {!nuevo && !borrar && <button type="button" className="peligro" onClick={() => setBorrar(true)}>Eliminar</button>}
           {!nuevo && borrar && <button type="button" className="peligro" onClick={eliminar}>Sí, eliminar el anuncio</button>}
         </div>

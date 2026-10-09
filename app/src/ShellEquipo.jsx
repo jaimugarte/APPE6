@@ -23,21 +23,21 @@ function SubBarra({ izq, der, valor, onCambio }) {
 }
 
 // Inicio del equipo (encargado y preceptores): barra de pestañas fija abajo, como en WhatsApp
-//   Tablón · Calendario (por defecto) · E6 (Asistencia | Estadísticas) · Chavales (con lupa y menú ⋮: Nuevo chaval, Importar, Solicitudes) · Varios (Dineros, Herramientas…)
+//   Tablón (por defecto) · Calendario · E6 (Asistencia | Estadísticas) · Chavales (con lupa y menú ⋮: Nuevo chaval, Importar, Solicitudes) · Varios (Dineros, Herramientas…)
 export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, pendientes, onCambio }) {
   const tiene = k => activas.some(a => a.app_clave === k)
   const asoc = mem.asociacion_id, rol = mem.rol
   const variosApps = activas.filter(a => !['asistencia', 'estadisticas', 'socios', 'actividades', 'anuncios'].includes(a.app_clave))
 
   const pestanas = [
-    tiene('actividades') && { id: 'tablon', nombre: 'Tablón', icono: 'tablon' },
-    tiene('actividades') && { id: 'act', nombre: 'Calendario', icono: 'actividades' },   // pestaña por defecto
+    tiene('actividades') && { id: 'tablon', nombre: 'Tablón', icono: 'tablon' },   // pestaña por defecto
+    tiene('actividades') && { id: 'act', nombre: 'Calendario', icono: 'actividades' },
     (tiene('asistencia') || tiene('estadisticas')) && { id: 'e6', nombre: 'E6', icono: 'asistencia' },
     (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'Chavales', icono: 'socios', insignia: pendientes },
     variosApps.length > 0 && { id: 'varios', nombre: 'Varios', icono: 'varios' }
   ].filter(Boolean)
 
-  const [tab, setTab] = useState(pestanas.find(p => p.id === 'act')?.id ?? pestanas[0]?.id)
+  const [tab, setTab] = useState(pestanas[0]?.id)   // el Tablón, si hay; si no, la primera
   const [foco, setFoco] = useState(null)   // actividad a la que lleva el tablón: { fecha, n }
   const [e6, setE6] = useState('asistencia')
   const [bd, setBd] = useState('socios')
