@@ -116,7 +116,7 @@ export function crearBD() {
       correo_padre: 'antonio@example.com', correo_madre: 'maria@example.com', movil_padre: '600111222', movil_madre: '600333444',
       direccion: 'Calle Mayor 1, 2º', descuento_tipo: 'porcentaje', descuento_valor: 10, descuento_nota: null, creada_en: H }],
     config_cuotas: [],
-    planes: [], furgonetas: [], plan_furgonetas: [], plan_inscritos: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [], hucha_movimientos: [],
+    planes: [], anuncios: [], furgonetas: [], plan_furgonetas: [], plan_inscritos: [], campos_trabajo: [], campo_participantes: [], retiradas_campo: [], hucha_movimientos: [],
     pagos_cuota: [],
     permisos_aprobacion: [{ asociacion_id: ASOC, email: 'preceptor@demo.es', alcance: 'su_nivel' }],
     solicitudes_alta: [
@@ -154,6 +154,15 @@ export function crearBD() {
   plan('pl-6', 20, 22, 'Curso de retiro de otoño', ['3º ESO', '4º ESO', '1º Bachillerato'], { tipo: 'curso_retiro', lugar: 'Casa de retiros', precio: 90, descripcion: 'Tres días de retiro.' })
   plan('pl-7', 16, 16, 'Convivencia de primaria', ['5º primaria', '6º primaria'], { tipo: 'convivencia', lugar: 'Albergue', precio: 30 })
   plan('pl-5', 12, 13, 'Convivencia de fin de semana', [], { tipo: 'convivencia', descripcion: 'Dos días en la casa de colonias.', lugar: 'Casa de colonias', precio: 45 })
+
+  // Tablón: la Gymkana solo aparece los 3 días anteriores; la Convivencia de primaria no lanza aviso emergente
+  db.planes.find(x => x.id === 'pl-4').tablon_dias_antes = 3
+  db.planes.find(x => x.id === 'pl-7').notificar = false
+  const nuevoAnuncio = (id, titulo, texto, niveles, caduca) => db.anuncios.push({ id, asociacion_id: ASOC, titulo, texto, niveles, caduca, creado_por: 'u-enc', creado_en: H })
+  nuevoAnuncio('an-1', 'Bienvenidos al nuevo curso', 'Empezamos el curso con muchas ganas. Las reuniones son los viernes a las 19:00 en la sede.', [], null)
+  nuevoAnuncio('an-2', 'Material para 1º ESO', 'Traed una libreta pequeña y un bolígrafo a la próxima charla.', ['1º ESO'], null)
+  nuevoAnuncio('an-3', 'Retiro de 3º y 4º ESO', 'Se abre la inscripción al retiro. Hablad con vuestro preceptor.', ['3º ESO', '4º ESO'], null)
+  nuevoAnuncio('an-4', 'Anuncio ya caducado', 'Este anuncio no debe verse.', [], '2020-01-01')
 
   // Límite de plazas y furgonetas de ejemplo
     db.planes.find(x => x.id === 'pl-5').limite = 20

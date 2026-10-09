@@ -5,23 +5,26 @@ import FamiliaHijos from './FamiliaHijos'
 import FamiliaCuotas from './FamiliaCuotas'
 import FamiliaAjustes from './FamiliaAjustes'
 import { AvisoPlanes } from './PlanesFamilia'
+import Tablon from './Tablon'
 
-// Inicio de las familias: barra inferior fija con Calendario (por defecto) · Hijos socios · Cuotas · Ajustes
+// Inicio de las familias: barra inferior fija con Tablón · Calendario (por defecto) · Hijos socios · Cuotas · Ajustes
 export default function ShellFamilia({ activas, mem, email, onCambio }) {
   const conCalendario = activas.some(a => a.app_clave === 'actividades')
   const pestanas = [
+    conCalendario && { id: 'tablon', nombre: 'Tablón', icono: 'tablon' },
     conCalendario && { id: 'act', nombre: 'Calendario', icono: 'actividades' },
     { id: 'hijos', nombre: 'Hijos socios', icono: 'hijos' },
     { id: 'cuotas', nombre: 'Cuotas', icono: 'cuotas' },
     { id: 'ajustes', nombre: 'Ajustes', icono: 'ajustes' }
   ].filter(Boolean)
-  const [tab, setTab] = useState(pestanas[0].id)
+  const [tab, setTab] = useState(conCalendario ? 'act' : 'hijos')   // Calendario por defecto
   const [foco, setFoco] = useState(null)   // plan al que lleva un aviso: { fecha, n }
 
   return (
     <>
       <AvisoPlanes activo={conCalendario} onAbrir={p => { setFoco({ fecha: p.fecha, n: Date.now() }); setTab('act') }} />
       {tab === 'act' && conCalendario && <Actividades asoc={mem.asociacion_id} rol="familia" email={email} foco={foco} />}
+      {tab === 'tablon' && conCalendario && <Tablon asoc={mem.asociacion_id} rol="familia" email={email} onAbrirPlan={p => { setFoco({ fecha: p.fecha, n: Date.now() }); setTab('act') }} />}
       {tab === 'hijos' && <FamiliaHijos onCambio={onCambio} />}
       {tab === 'cuotas' && <FamiliaCuotas />}
       {tab === 'ajustes' && <FamiliaAjustes />}

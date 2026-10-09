@@ -4,6 +4,7 @@ import Socios from './Socios'
 import Asistencia from './Asistencia'
 import Actividades from './Actividades'
 import Furgonetas from './Furgonetas'
+import Tablon from './Tablon'
 import Solicitudes from './Solicitudes'
 import Herramientas from './Herramientas'
 import Dineros from './Dineros'
@@ -22,20 +23,22 @@ function SubBarra({ izq, der, valor, onCambio }) {
 }
 
 // Inicio del equipo (encargado y preceptores): barra de pestañas fija abajo, como en WhatsApp
-//   Calendario (por defecto) · E6 (Asistencia | Estadísticas) · Chavales (con lupa y menú ⋮: Nuevo chaval, Importar, Solicitudes) · Varios (Dineros, Herramientas…)
+//   Tablón · Calendario (por defecto) · E6 (Asistencia | Estadísticas) · Chavales (con lupa y menú ⋮: Nuevo chaval, Importar, Solicitudes) · Varios (Dineros, Herramientas…)
 export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, pendientes, onCambio }) {
   const tiene = k => activas.some(a => a.app_clave === k)
   const asoc = mem.asociacion_id, rol = mem.rol
-  const variosApps = activas.filter(a => !['asistencia', 'estadisticas', 'socios', 'actividades'].includes(a.app_clave))
+  const variosApps = activas.filter(a => !['asistencia', 'estadisticas', 'socios', 'actividades', 'anuncios'].includes(a.app_clave))
 
   const pestanas = [
+    tiene('actividades') && { id: 'tablon', nombre: 'Tablón', icono: 'tablon' },
     tiene('actividades') && { id: 'act', nombre: 'Calendario', icono: 'actividades' },   // pestaña por defecto
     (tiene('asistencia') || tiene('estadisticas')) && { id: 'e6', nombre: 'E6', icono: 'asistencia' },
     (tiene('socios') || conSolicitudes) && { id: 'bd', nombre: 'Chavales', icono: 'socios', insignia: pendientes },
     variosApps.length > 0 && { id: 'varios', nombre: 'Varios', icono: 'varios' }
   ].filter(Boolean)
 
-  const [tab, setTab] = useState(pestanas[0]?.id)
+  const [tab, setTab] = useState(pestanas.find(p => p.id === 'act')?.id ?? pestanas[0]?.id)
+  const [foco, setFoco] = useState(null)   // actividad a la que lleva el tablón: { fecha, n }
   const [e6, setE6] = useState('asistencia')
   const [bd, setBd] = useState('socios')
   const [varios, setVarios] = useState(null)   // null = bloques; si no, clave de la app abierta
@@ -66,7 +69,8 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
         </>}
       </>}
 
-      {actual === 'act' && <Actividades asoc={asoc} rol={rol} email={email} />}
+      {actual === 'tablon' && <Tablon asoc={asoc} rol={rol} email={email} onAbrirPlan={p => { setFoco({ fecha: p.fecha, n: Date.now() }); setTab('act') }} />}
+      {actual === 'act' && <Actividades asoc={asoc} rol={rol} email={email} foco={foco} />}
 
       {actual === 'varios' && (appVarios
         ? <>
@@ -92,7 +96,7 @@ export default function ShellEquipo({ activas, mem, email, uid, conSolicitudes, 
       <nav className="barra-inferior" aria-label="Secciones">
         {pestanas.map(p => (
           <button key={p.id} className={actual === p.id ? 'on' : ''} aria-current={actual === p.id ? 'page' : undefined}
-            onClick={() => { setTab(p.id); if (p.id === 'varios') setVarios(null) }}>
+            onClick={() => { setTab(p.id); setFoco(null); if (p.id === 'varios') setVarios(null) }}>
             <span className="ico"><IconoApp clave={p.icono} size={24} />{p.insignia > 0 && <span className="contador" aria-label={`${p.insignia} pendientes`}>{p.insignia}</span>}</span>
             <span>{p.nombre}</span>
           </button>

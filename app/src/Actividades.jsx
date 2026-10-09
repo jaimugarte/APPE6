@@ -14,7 +14,7 @@ const diaLargo = iso => {
   const d = deIso(iso)
   return `${DIAS[(d.getDay() + 6) % 7]} ${d.getDate()}/${d.getMonth() + 1}`
 }
-const VACIO = { tipo: 'plan', titulo: '', descripcion: '', lugar: '', fecha: '', fecha_fin: '', hora_inicio: '', hora_fin: '', precio: '', limite: '', niveles: [] }
+const VACIO = { tipo: 'plan', titulo: '', descripcion: '', lugar: '', fecha: '', fecha_fin: '', hora_inicio: '', hora_fin: '', precio: '', limite: '', niveles: [], notificar: true, en_tablon: true, tablon_dias_antes: null }
 const activoSocio = s => !!s.no_socio || !!s.periodos_alta?.some(p => !p.fecha_baja)
 // «10/20» (o «10» si no hay límite); sobrepasado = más apuntados que plazas
 const cuenta = (n, limite) => (limite != null ? `${n}/${limite}` : n > 0 ? String(n) : '')
@@ -192,7 +192,7 @@ export default function Actividades({ asoc, rol, email, foco }) {
       )}
 
       {puedeCrear && !familia && (
-        <button className="fab" aria-label="Nuevo plan" title="Nuevo plan"
+        <button className="fab" aria-label="Nueva actividad" title="Nueva actividad"
           onClick={() => setEditando({ ...VACIO, fecha: sel || hoyIso, fecha_fin: sel || hoyIso })}>
           <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
@@ -286,7 +286,8 @@ function Editor({ plan, asoc, niveles, todos, socios, inscritos, onVolver, onGua
   const [f, setF] = useState({
     ...VACIO, ...plan, precio: plan.precio ? String(plan.precio) : '', limite: plan.limite != null ? String(plan.limite) : '',
     descripcion: plan.descripcion || '', lugar: plan.lugar || '',
-    hora_inicio: hora(plan.hora_inicio), hora_fin: hora(plan.hora_fin)
+    hora_inicio: hora(plan.hora_inicio), hora_fin: hora(plan.hora_fin),
+    tablon_modo: plan.tablon_dias_antes ? 'antes' : 'ya', tablon_dias: String(plan.tablon_dias_antes || 7)
   })
   const [msg, setMsg] = useState('')
   const [borrar, setBorrar] = useState(false)
@@ -331,7 +332,10 @@ function Editor({ plan, asoc, niveles, todos, socios, inscritos, onVolver, onGua
     if (!(precio >= 0)) return setMsg('El precio no es válido.')
     if (limite !== null && !(Number.isInteger(limite) && limite > 0)) return setMsg('El límite de plazas debe ser un número entero mayor que 0 (o déjalo vacío).')
     if (!todos && f.niveles.length === 0) return setMsg('Elige al menos un nivel.')
+    const diasAntes = f.en_tablon && f.tablon_modo === 'antes' ? Number(f.tablon_dias) : null
+    if (diasAntes !== null && !(Number.isInteger(diasAntes) && diasAntes >= 1 && diasAntes <= 90)) return setMsg('Indica entre 1 y 90 días de antelación para el tablón.')
     const fila = {
+      notificar: !!f.notificar, en_tablon: !!f.en_tablon, tablon_dias_antes: diasAntes,
       tipo: f.tipo, titulo: f.titulo.trim(), descripcion: f.descripcion.trim() || null, lugar: f.lugar.trim() || null,
       fecha: f.fecha, fecha_fin: f.fecha_fin || f.fecha, hora_inicio: f.hora_inicio || null, hora_fin: f.hora_fin || null,
       precio, niveles: f.niveles, limite
@@ -376,7 +380,7 @@ function Editor({ plan, asoc, niveles, todos, socios, inscritos, onVolver, onGua
   return (
     <main className="actividades">
       <div className="barra">
-        <h2>{nuevo ? 'Nuevo plan' : 'Editar plan'}</h2>
+        <h2>{nuevo ? 'Nueva actividad' : 'Editar actividad'}</h2>
         <button onClick={onVolver}>Cancelar</button>
       </div>
       <form className="formgrid" onSubmit={guardar}>
@@ -406,6 +410,22 @@ function Editor({ plan, asoc, niveles, todos, socios, inscritos, onVolver, onGua
           <small className="aviso">{todos ? 'Si no eliges ninguno, el plan es para todos los niveles.' : 'Solo puedes elegir entre tus niveles.'}</small>
         </div>
 
+        <div className="campo ancho notif-fam">
+          <span>Avisar a las familias</span>
+          <label className="check"><input type="checkbox" checked={!!f.notificar} onChange={e => set('notificar', e.target.checked)} />
+            <span>Aviso emergente al crearla <small>(les sale una notificación flotante)</small></span></label>
+          <label className="check"><input type="checkbox" checked={!!f.en_tablon} onChange={e => set('en_tablon', e.target.checked)} />
+            <span>Añadir al tablón de anuncios <small>(se retira sola cuando pasa)</small></span></label>
+          {f.en_tablon && (
+            <div className="tablon-modo">
+              <label className="check"><input type="radio" name="tablon_modo" checked={f.tablon_modo === 'ya'} onChange={() => set('tablon_modo', 'ya')} /><span>Desde que se crea</span></label>
+              <label className="check"><input type="radio" name="tablon_modo" checked={f.tablon_modo === 'antes'} onChange={() => set('tablon_modo', 'antes')} />
+                <span>Solo los <input className="dias" inputMode="numeric" aria-label="Días de antelación" value={f.tablon_dias}
+                  onFocus={() => set('tablon_modo', 'antes')} onChange={e => set('tablon_dias', e.target.value.replace(/\D/g, '').slice(0, 2))} /> días antes</span></label>
+            </div>
+          )}
+        </div>
+
         {furgos.length > 0 && (
           <div className="campo ancho">
             <span>Furgonetas</span>
@@ -432,9 +452,9 @@ function Editor({ plan, asoc, niveles, todos, socios, inscritos, onVolver, onGua
 
         {msg && <p className="error ancho">{msg}</p>}
         <div className="fila ancho">
-          <button className="primario" type="submit">{nuevo ? 'Crear plan' : 'Guardar'}</button>
+          <button className="primario" type="submit">{nuevo ? 'Crear actividad' : 'Guardar'}</button>
           {!nuevo && !borrar && <button type="button" className="peligro" onClick={() => setBorrar(true)}>Eliminar</button>}
-          {!nuevo && borrar && <button type="button" className="peligro" onClick={eliminar}>Sí, eliminar el plan</button>}
+          {!nuevo && borrar && <button type="button" className="peligro" onClick={eliminar}>Sí, eliminar la actividad</button>}
         </div>
       </form>
     </main>

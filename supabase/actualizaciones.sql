@@ -621,3 +621,33 @@ begin
   if p.limite is not null and n >= p.limite then raise exception 'No quedan plazas'; end if;
   insert into plan_inscritos(plan_id, socio_id) values (p_plan, p_socio);
 end $$;
+
+-- ---------- TABLÓN: avisos de las actividades y anuncios propios ----------
+-- Cada actividad decide si lanza un aviso emergente a las familias, si va al tablón y desde cuándo (null = desde que se crea).
+alter table planes add column if not exists notificar boolean not null default true;
+alter table planes add column if not exists en_tablon boolean not null default true;
+alter table planes add column if not exists tablon_dias_antes integer check (tablon_dias_antes is null or tablon_dias_antes between 1 and 90);
+
+-- Anuncios: los publica quien puede crear actividades (encargado; preceptores con permiso, para sus niveles).
+-- niveles vacío = todo el club. Se ven con las mismas reglas que las actividades y desaparecen al pasar «caduca».
+create table if not exists anuncios (
+  id uuid primary key default gen_random_uuid(),
+  asociacion_id uuid not null references asociaciones on delete cascade,
+  titulo text not null check (length(trim(titulo)) between 1 and 120),
+  texto text not null default '' check (length(texto) <= 4000),
+  niveles text[] not null default '{}',
+  caduca date,
+  creado_por uuid references perfiles default auth.uid(),
+  creado_en timestamptz not null default now()
+);
+create index if not exists anuncios_asoc on anuncios(asociacion_id, creado_en desc);
+alter table anuncios enable row level security;
+drop policy if exists an_ver on anuncios;
+create policy an_ver on anuncios for select using (puede_plan(asociacion_id, niveles, 'ver'));
+drop policy if exists an_ins on anuncios;
+create policy an_ins on anuncios for insert with check (puede_plan(asociacion_id, niveles, 'editar'));
+drop policy if exists an_upd on anuncios;
+create policy an_upd on anuncios for update
+  using (puede_plan(asociacion_id, niveles, 'editar')) with check (puede_plan(asociacion_id, niveles, 'editar'));
+drop policy if exists an_del on anuncios;
+create policy an_del on anuncios for delete using (puede_plan(asociacion_id, niveles, 'editar'));

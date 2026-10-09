@@ -82,8 +82,8 @@ const guardarVistos = l => { try { localStorage.setItem(CLAVE_VISTOS, JSON.strin
 export function AvisoPlanes({ activo, onAbrir }) {
   const [nuevos, setNuevos] = useState([])
   const comprobar = useCallback(async () => {
-    const { data } = await supabase.from('planes').select('id, titulo, fecha, fecha_fin, creado_en').gte('fecha_fin', hoy()).order('creado_en', { ascending: false })
-    const planes = data || []
+    const { data } = await supabase.from('planes').select('id, titulo, fecha, fecha_fin, creado_en, notificar').gte('fecha_fin', hoy()).order('creado_en', { ascending: false })
+    const planes = (data || []).filter(p => p.notificar !== false)   // solo los que lanzan aviso emergente
     let vistos = leerVistos()
     if (vistos === null) {   // primera vez en este dispositivo: solo se avisa de lo creado en los últimos 3 días
       const lim = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)

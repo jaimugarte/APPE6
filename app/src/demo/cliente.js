@@ -12,7 +12,7 @@ const PK = {
   preceptor_niveles: ['asociacion_id', 'email', 'nivel'], socios: ['id'], periodos_alta: ['id'],
   socios_bancarios: ['socio_id'], socios_equipo: ['socio_id'], familiares_socios: ['email', 'socio_id'], tipos_actividad: ['id'],
   registros_asistencia: ['socio_id', 'tipo_actividad_id', 'periodo_inicio'], global_admins: ['email'],
-  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], furgonetas: ['id'], plan_furgonetas: ['plan_id', 'furgoneta_id'], plan_inscritos: ['plan_id', 'socio_id'], hucha_movimientos: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
+  enlaces_alta: ['id'], familias: ['id'], permisos_aprobacion: ['asociacion_id', 'email'], solicitudes_alta: ['id'], config_cuotas: ['asociacion_id'], pagos_cuota: ['familia_id', 'mes'], planes: ['id'], anuncios: ['id'], furgonetas: ['id'], plan_furgonetas: ['plan_id', 'furgoneta_id'], plan_inscritos: ['plan_id', 'socio_id'], hucha_movimientos: ['id'], campos_trabajo: ['id'], campo_participantes: ['campo_id', 'socio_id'], retiradas_campo: ['id']
 }
 
 const REL = {
@@ -179,6 +179,7 @@ export function crearClienteDemo() {
       case 'pagos_cuota': { const f = db.familias.find(x => x.id === r.familia_id); return !!f && f.asociacion_id === u.asoc && (u.rol === 'encargado' || f.emails.includes(u.email)) }
       case 'config_cuotas': return r.asociacion_id === u.asoc && u.rol === 'encargado'
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'ver')
+      case 'anuncios': return puedePlan(u, r.asociacion_id, r.niveles, 'ver')
       case 'furgonetas': return esEquipoApp(u, r.asociacion_id, 'furgonetas')
       case 'plan_furgonetas': return appActiva(u, 'furgonetas') && puedePlanEquipo(u, planDe(r.plan_id), 'ver')
       case 'plan_inscritos': return puedePlanEquipo(u, planDe(r.plan_id), 'ver')
@@ -204,6 +205,7 @@ export function crearClienteDemo() {
       case 'permisos_preceptor': case 'preceptor_niveles': case 'tipos_actividad': case 'enlaces_alta': case 'permisos_aprobacion': case 'config_cuotas':
         return u.rol === 'encargado' && r.asociacion_id === u.asoc
       case 'planes': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
+      case 'anuncios': return puedePlan(u, r.asociacion_id, r.niveles, 'editar')
       case 'furgonetas': return u.rol === 'encargado' && r.asociacion_id === u.asoc && appActiva(u, 'furgonetas')
       case 'plan_furgonetas': return appActiva(u, 'furgonetas') && puedePlanEquipo(u, planDe(r.plan_id), 'editar')
       case 'plan_inscritos': return puedePlanEquipo(u, planDe(r.plan_id), 'editar') && socioDe(r.socio_id)?.asociacion_id === planDe(r.plan_id)?.asociacion_id
@@ -232,7 +234,8 @@ export function crearClienteDemo() {
       f.importe = Math.round(Number(f.importe) * 100) / 100 }
     if (tabla === 'campos_trabajo') { f.descripcion ??= null; f.responsable_email ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'campo_participantes') f.importe ??= 0
-    if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.limite ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
+    if (tabla === 'planes') { f.tipo ??= 'plan'; f.descripcion ??= null; f.lugar ??= null; f.hora_inicio ??= null; f.hora_fin ??= null; f.precio ??= 0; f.niveles ??= []; f.limite ??= null; f.notificar ??= true; f.en_tablon ??= true; f.tablon_dias_antes ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso; f.fecha_fin ??= f.fecha }
+    if (tabla === 'anuncios') { f.texto ??= ''; f.niveles ??= []; f.caduca ??= null; f.creado_por ??= ctx()?.id; f.creado_en ??= new Date().toISOString() }
     if (tabla === 'furgonetas') { f.matricula ??= null; f.activa ??= true; f.creada_en ??= hoyIso }
     if (tabla === 'plan_inscritos') { f.creado_por ??= ctx()?.id; f.creado_en ??= hoyIso }
     if (tabla === 'config_cuotas') { f.importes ??= [...IMPORTES_POR_DEFECTO]; f.preceptores_descuento ??= false }
@@ -326,6 +329,10 @@ export function crearClienteDemo() {
             return err('23514', 'new row for relation "hucha_movimientos" violates check constraint')
           if (tabla === 'furgonetas' && (!String(f.nombre ?? '').trim() || !(Number(f.plazas) > 0)))
             return err('23514', 'new row for relation "furgonetas" violates check constraint')
+          if (tabla === 'anuncios' && (!String(f.titulo ?? '').trim() || String(f.titulo).length > 120 || String(f.texto).length > 4000))
+            return err('23514', 'new row for relation "anuncios" violates check constraint')
+          if (tabla === 'planes' && f.tablon_dias_antes != null && !(Number.isInteger(f.tablon_dias_antes) && f.tablon_dias_antes >= 1 && f.tablon_dias_antes <= 90))
+            return err('23514', 'new row for relation "planes" violates check constraint')
           if (tabla === 'planes' && f.limite != null && !(Number(f.limite) > 0))
             return err('23514', 'new row for relation "planes" violates check constraint')
           if (tabla === 'plan_furgonetas') {

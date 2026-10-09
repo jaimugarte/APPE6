@@ -600,3 +600,17 @@ a.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 
 .deslizable { overflow: hidden; touch-action: pan-y; }
 .deslizable-in { will-change: transform; }
 @media (pointer: coarse) { .calendario-mes .nav-per .flecha { display: none; } }
+
+/* Tablón y notificaciones de actividad */
+.tablon-sec { margin-bottom: 18px; }
+.tablon-sec h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1rem; }
+.tablon-sec h3 i { width: 10px; height: 10px; border-radius: 3px; }
+.anuncio-texto { white-space: pre-wrap; }
+.actividad-tablon .meta, .anuncio .meta { color: var(--tinta-3); }
+.notif-fam { display: grid; gap: 6px; }
+.check { display: flex; align-items: flex-start; gap: 8px; min-height: 32px; font-size: .92rem; }
+.check input[type=checkbox], .check input[type=radio] { flex: none; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; }
+.check small { color: var(--tinta-3); }
+.tablon-modo { display: grid; gap: 2px; margin-left: 26px; }
+input.dias { display: inline-block; width: 3.2ch; min-height: 0; padding: 2px 6px; text-align: center; }
+.check input.dias { width: 4ch; max-width: 4ch; display: inline-block; vertical-align: baseline; }
